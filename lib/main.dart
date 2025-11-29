@@ -21,7 +21,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   if (kIsWeb) {
     // Firebase web config (from Firebase Console → Project Settings → Web App)
     await Firebase.initializeApp(
@@ -135,6 +135,22 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize notification service for web and mobile
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService.initialize();
+      print('Notification service initialized successfully');
+    } catch (e) {
+      print('Error initializing notification service: $e');
+    }
+  }
+
   Future<String?> _checkLoginStatus() async {
     await Future.delayed(const Duration(seconds: 1));
 
@@ -162,24 +178,23 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => NoticeProvider()
-        ),
+        ChangeNotifierProvider(create: (_) => NoticeProvider()),
         Provider(create: (context) => AuthService()),
-        Provider<TaskService>(
-          create: (_) => TaskService(),
-        ),
-        Provider<ReportService>(
-          create: (_) => ReportService(),
-        ),
-        Provider<TeamService>( // Add TeamService provider
+        Provider<TaskService>(create: (_) => TaskService()),
+        Provider<ReportService>(create: (_) => ReportService()),
+        Provider<TeamService>(
+          // Add TeamService provider
           create: (_) => TeamService(),
         ),
-        Provider<UserService>( // Add UserService provider
+        Provider<UserService>(
+          // Add UserService provider
           create: (_) => UserService(),
         ),
-        Provider(create: (_) => UserTeamRoleService())
-        ],
+        Provider(create: (_) => UserTeamRoleService()),
+        Provider(
+          create: (_) => NotificationService(),
+        ), // Add NotificationService provider
+      ],
       child: MaterialApp(
         title: 'VeVji',
         theme: ThemeData(
@@ -187,7 +202,6 @@ class _MyAppState extends State<MyApp> {
             seedColor: Colors.deepPurple,
             primary: Colors.deepPurple,
             secondary: Colors.amberAccent,
-            
           ),
           floatingActionButtonTheme: FloatingActionButtonThemeData(
             backgroundColor: Colors.deepPurple,
@@ -211,7 +225,7 @@ class _MyAppState extends State<MyApp> {
               color: Colors.deepPurple.shade900,
               fontSize: 18,
               fontWeight: FontWeight.bold,
-            )
+            ),
           ),
           appBarTheme: AppBarTheme(
             backgroundColor: Colors.white,

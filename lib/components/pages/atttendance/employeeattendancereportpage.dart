@@ -2,6 +2,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
 import 'package:vevij/components/imports.dart';
 import 'dart:convert';
+import 'dart:html' as html;
+
 class AttendanceReportPage extends StatefulWidget {
   const AttendanceReportPage({super.key});
 
@@ -49,11 +51,16 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         _userId = user.uid;
         _userName = user.displayName ?? 'User';
       });
-      
+
       try {
-        final userDoc = await _firestore.collection('users').doc(user.uid).get();
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
         if (userDoc.exists) {
-          final employee = Employee.fromMap(userDoc.data() as Map<String, dynamic>);
+          final employee = Employee.fromMap(
+            userDoc.data() as Map<String, dynamic>,
+          );
           setState(() {
             _empId = employee.empCode;
             _userName = employee.empName;
@@ -89,8 +96,17 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
 
       if (_dateRange != null) {
         final startTimestamp = Timestamp.fromDate(_dateRange!.start);
-        final endTimestamp = Timestamp.fromDate(DateTime(_dateRange!.end.year, _dateRange!.end.month, _dateRange!.end.day, 23, 59, 59));
-        
+        final endTimestamp = Timestamp.fromDate(
+          DateTime(
+            _dateRange!.end.year,
+            _dateRange!.end.month,
+            _dateRange!.end.day,
+            23,
+            59,
+            59,
+          ),
+        );
+
         query = query
             .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
             .where('createdAt', isLessThanOrEqualTo: endTimestamp)
@@ -99,7 +115,12 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
 
       final snapshot = await query.get();
       List<AttendanceRecord> records = snapshot.docs
-          .map((doc) => AttendanceRecord.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+          .map(
+            (doc) => AttendanceRecord.fromMap(
+              doc.id,
+              doc.data() as Map<String, dynamic>,
+            ),
+          )
           .toList();
 
       // Apply filters
@@ -192,9 +213,12 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
       totalDistance += record.totalDistanceTraveled;
       totalOvertimeHours += record.otHrs;
 
-      if (record.type1 == 'DP') presentDays++;
-      else if (record.type1 == 'HD') halfDays++;
-      else if (record.type1 == 'ABS') absentDays++;
+      if (record.type1 == 'DP')
+        presentDays++;
+      else if (record.type1 == 'HD')
+        halfDays++;
+      else if (record.type1 == 'ABS')
+        absentDays++;
 
       if (record.lateHrs > 0) {
         lateArrivals++;
@@ -208,7 +232,8 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         final breakTime = record.totalBreakTime ?? '00:00:00';
         final breakParts = breakTime.split(':');
         if (breakParts.length >= 2) {
-          totalBreakMinutes += int.parse(breakParts[0]) * 60 + int.parse(breakParts[1]);
+          totalBreakMinutes +=
+              int.parse(breakParts[0]) * 60 + int.parse(breakParts[1]);
         }
       } catch (e) {
         // Invalid format, skip
@@ -219,8 +244,12 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     final avgHours = workingDays > 0 ? totalHours / workingDays : 0.0;
     final avgDistance = totalDays > 0 ? totalDistance / totalDays : 0.0;
     final avgBreak = totalDays > 0 ? totalBreakMinutes / totalDays : 0.0;
-    final punctualityRate = totalDays > 0 ? (onTimeArrivals / totalDays) * 100 : 0.0;
-    final attendanceRate = totalDays > 0 ? (workingDays / totalDays) * 100 : 0.0;
+    final punctualityRate = totalDays > 0
+        ? (onTimeArrivals / totalDays) * 100
+        : 0.0;
+    final attendanceRate = totalDays > 0
+        ? (workingDays / totalDays) * 100
+        : 0.0;
 
     _statistics = {
       'totalDays': totalDays,
@@ -246,11 +275,9 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      appBar:
-       AppBar(
+      appBar: AppBar(
         title: Text('Attendance Report', style: TextStyle(color: Colors.black)),
-        leading: BackButton(color: Colors.black,
-        ),
+        leading: BackButton(color: Colors.black),
       ),
       body: CustomScrollView(
         controller: ScrollController(),
@@ -281,7 +308,6 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     );
   }
 
-
   Widget _buildFilterPanel() {
     return Card(
       margin: EdgeInsets.all(16),
@@ -291,10 +317,16 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         children: [
           ListTile(
             leading: Icon(Icons.filter_list, color: Colors.indigo),
-            title: Text('Filters', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(
+              'Filters',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             trailing: IconButton(
-              icon: Icon(_isFilterExpanded ? Icons.expand_less : Icons.expand_more),
-              onPressed: () => setState(() => _isFilterExpanded = !_isFilterExpanded),
+              icon: Icon(
+                _isFilterExpanded ? Icons.expand_less : Icons.expand_more,
+              ),
+              onPressed: () =>
+                  setState(() => _isFilterExpanded = !_isFilterExpanded),
             ),
           ),
           if (_isFilterExpanded) ...[
@@ -356,19 +388,25 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
             _buildQuickFilter('This Week', () {
               final now = DateTime.now();
               final start = now.subtract(Duration(days: now.weekday - 1));
-              setState(() => _dateRange = DateTimeRange(start: start, end: now));
+              setState(
+                () => _dateRange = DateTimeRange(start: start, end: now),
+              );
             }),
             _buildQuickFilter('This Month', () {
               final now = DateTime.now();
               final start = DateTime(now.year, now.month, 1);
               final end = DateTime(now.year, now.month + 1, 0);
-              setState(() => _dateRange = DateTimeRange(start: start, end: end));
+              setState(
+                () => _dateRange = DateTimeRange(start: start, end: end),
+              );
             }),
             _buildQuickFilter('Last Month', () {
               final now = DateTime.now();
               final start = DateTime(now.year, now.month - 1, 1);
               final end = DateTime(now.year, now.month, 0);
-              setState(() => _dateRange = DateTimeRange(start: start, end: end));
+              setState(
+                () => _dateRange = DateTimeRange(start: start, end: end),
+              );
             }),
           ],
         ),
@@ -452,7 +490,10 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Additional Filters', style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(
+          'Additional Filters',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         SizedBox(height: 8),
         CheckboxListTile(
           title: Text('Late Arrivals Only'),
@@ -473,7 +514,10 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Minimum Distance (km)', style: TextStyle(fontSize: 12)),
-            Text('${_minDistance.toStringAsFixed(0)} km', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              '${_minDistance.toStringAsFixed(0)} km',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         Slider(
@@ -501,11 +545,26 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
           items: [
-            DropdownMenuItem(value: 'date_desc', child: Text('Date (Newest First)')),
-            DropdownMenuItem(value: 'date_asc', child: Text('Date (Oldest First)')),
-            DropdownMenuItem(value: 'hours_high', child: Text('Hours (High to Low)')),
-            DropdownMenuItem(value: 'hours_low', child: Text('Hours (Low to High)')),
-            DropdownMenuItem(value: 'distance', child: Text('Distance Traveled')),
+            DropdownMenuItem(
+              value: 'date_desc',
+              child: Text('Date (Newest First)'),
+            ),
+            DropdownMenuItem(
+              value: 'date_asc',
+              child: Text('Date (Oldest First)'),
+            ),
+            DropdownMenuItem(
+              value: 'hours_high',
+              child: Text('Hours (High to Low)'),
+            ),
+            DropdownMenuItem(
+              value: 'hours_low',
+              child: Text('Hours (Low to High)'),
+            ),
+            DropdownMenuItem(
+              value: 'distance',
+              child: Text('Distance Traveled'),
+            ),
           ],
           onChanged: (val) => setState(() => _sortBy = val ?? 'date_desc'),
         ),
@@ -519,7 +578,10 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Summary', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(
+            'Summary',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           SizedBox(height: 16),
           GridView.count(
             crossAxisCount: 4,
@@ -564,7 +626,13 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, String subtitle, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    String subtitle,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -585,12 +653,24 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
             SizedBox(height: 8),
             Text(
               value,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 4),
-            Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[700]), textAlign: TextAlign.center),
-            Text(subtitle, style: TextStyle(fontSize: 10, color: Colors.grey[600]), textAlign: TextAlign.center),
+            Text(
+              title,
+              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -616,7 +696,10 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
               children: [
                 Icon(Icons.lightbulb, color: Colors.amber),
                 SizedBox(width: 8),
-                Text('Insights', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(
+                  'Insights',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             SizedBox(height: 16),
@@ -635,11 +718,12 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
               'You traveled ${totalDistance.toStringAsFixed(1)} km in total',
               Colors.purple,
             ),
-            if (avgBreak > 0) _buildInsightItem(
-              Icons.coffee,
-              'Average break time: ${avgBreak.toStringAsFixed(0)} minutes',
-              Colors.orange,
-            ),
+            if (avgBreak > 0)
+              _buildInsightItem(
+                Icons.coffee,
+                'Average break time: ${avgBreak.toStringAsFixed(0)} minutes',
+                Colors.orange,
+              ),
           ],
         ),
       ),
@@ -653,9 +737,7 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         children: [
           Icon(icon, color: color, size: 20),
           SizedBox(width: 12),
-          Expanded(
-            child: Text(text, style: TextStyle(fontSize: 14)),
-          ),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 14))),
         ],
       ),
     );
@@ -675,20 +757,63 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         children: [
           Padding(
             padding: EdgeInsets.all(16),
-            child: Text('Detailed Records', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Detailed Records',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: [
-                DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Day', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Login', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Logout', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Hours', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Break', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Distance', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                  label: Text(
+                    'Date',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Day',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Login',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Logout',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Hours',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Break',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Distance',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Status',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
               rows: pageRecords.map((record) {
                 return DataRow(
@@ -703,7 +828,11 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                           if (record.lateHrs > 0)
                             Padding(
                               padding: EdgeInsets.only(left: 4),
-                              child: Icon(Icons.warning, color: Colors.red, size: 16),
+                              child: Icon(
+                                Icons.warning,
+                                color: Colors.red,
+                                size: 16,
+                              ),
                             ),
                         ],
                       ),
@@ -711,10 +840,17 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                     DataCell(Text(record.outTime ?? '—')),
                     DataCell(Text('${record.totHrs.toStringAsFixed(1)}')),
                     DataCell(Text(record.totalBreakTime ?? '00:00')),
-                    DataCell(Text('${record.totalDistanceTraveled.toStringAsFixed(1)}')),
+                    DataCell(
+                      Text(
+                        '${record.totalDistanceTraveled.toStringAsFixed(1)}',
+                      ),
+                    ),
                     DataCell(
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: _getStatusColor(record.type1).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
@@ -739,7 +875,9 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Showing ${startIndex + 1}-$endIndex of ${_records.length}'),
+                Text(
+                  'Showing ${startIndex + 1}-$endIndex of ${_records.length}',
+                ),
                 Row(
                   children: [
                     IconButton(
@@ -765,7 +903,6 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     );
   }
 
-
   Widget _buildEmptyState() {
     return Center(
       child: SingleChildScrollView(
@@ -776,7 +913,11 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
             SizedBox(height: 24),
             Text(
               'No Records Found',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
             ),
             SizedBox(height: 8),
             Text(
@@ -855,6 +996,8 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   void _showExportOptions() {
     showModalBottomSheet(
       context: context,
+      isDismissible: true,
+      isScrollControlled: true,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -918,8 +1061,16 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
 
   Future<void> _exportAsPdf() async {
     try {
-      final pdf = pw.Document();
-      
+      final fontRegular = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+      );
+      final fontBold = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Bold.ttf'),
+      );
+      final pdf = pw.Document(
+        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
+      );
+
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
@@ -931,17 +1082,38 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('Attendance Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                    pw.Text(
+                      'Attendance Report',
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
                     pw.SizedBox(height: 8),
-                    pw.Text('Employee: $_userName | ID: $_empId', style: pw.TextStyle(fontSize: 12)),
-                    pw.Text('Period: ${DateFormat('dd MMM yyyy').format(_dateRange!.start)} - ${DateFormat('dd MMM yyyy').format(_dateRange!.end)}', style: pw.TextStyle(fontSize: 12)),
-                    pw.Text('Generated: ${DateFormat('dd MMM yyyy HH:mm').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text(
+                      'Employee: $_userName | ID: $_empId',
+                      style: pw.TextStyle(fontSize: 12),
+                    ),
+                    pw.Text(
+                      'Period: ${DateFormat('dd MMM yyyy').format(_dateRange!.start)} - ${DateFormat('dd MMM yyyy').format(_dateRange!.end)}',
+                      style: pw.TextStyle(fontSize: 12),
+                    ),
+                    pw.Text(
+                      'Generated: ${DateFormat('dd MMM yyyy HH:mm').format(DateTime.now())}',
+                      style: pw.TextStyle(fontSize: 10),
+                    ),
                     pw.Divider(),
                   ],
                 ),
               ),
               pw.SizedBox(height: 20),
-              pw.Text('Summary Statistics', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Summary Statistics',
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 10),
               pw.Table(
                 border: pw.TableBorder.all(),
@@ -949,26 +1121,77 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                   pw.TableRow(
                     decoration: pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
-                      pw.Padding(padding: pw.EdgeInsets.all(8), child: pw.Text('Metric', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: pw.EdgeInsets.all(8), child: pw.Text('Value', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Metric',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Value',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                      ),
                     ],
                   ),
-                  _buildPdfTableRow('Total Days', '${_statistics['totalDays']}'),
-                  _buildPdfTableRow('Working Days', '${_statistics['workingDays']}'),
-                  _buildPdfTableRow('Present Days', '${_statistics['presentDays']}'),
+                  _buildPdfTableRow(
+                    'Total Days',
+                    '${_statistics['totalDays']}',
+                  ),
+                  _buildPdfTableRow(
+                    'Working Days',
+                    '${_statistics['workingDays']}',
+                  ),
+                  _buildPdfTableRow(
+                    'Present Days',
+                    '${_statistics['presentDays']}',
+                  ),
                   _buildPdfTableRow('Half Days', '${_statistics['halfDays']}'),
-                  _buildPdfTableRow('Absent Days', '${_statistics['absentDays']}'),
-                  _buildPdfTableRow('Total Hours', '${(_statistics['totalHours'] ?? 0).toStringAsFixed(2)}'),
-                  _buildPdfTableRow('Average Hours/Day', '${(_statistics['avgHours'] ?? 0).toStringAsFixed(2)}'),
-                  _buildPdfTableRow('Late Arrivals', '${_statistics['lateArrivals']}'),
-                  _buildPdfTableRow('Total Late Hours', '${(_statistics['totalLateHours'] ?? 0).toStringAsFixed(2)}'),
-                  _buildPdfTableRow('Punctuality Rate', '${(_statistics['punctualityRate'] ?? 0).toStringAsFixed(1)}%'),
-                  _buildPdfTableRow('Total Distance', '${(_statistics['totalDistance'] ?? 0).toStringAsFixed(2)} km'),
-                  _buildPdfTableRow('Average Distance/Day', '${(_statistics['avgDistance'] ?? 0).toStringAsFixed(2)} km'),
+                  _buildPdfTableRow(
+                    'Absent Days',
+                    '${_statistics['absentDays']}',
+                  ),
+                  _buildPdfTableRow(
+                    'Total Hours',
+                    '${(_statistics['totalHours'] ?? 0).toStringAsFixed(2)}',
+                  ),
+                  _buildPdfTableRow(
+                    'Average Hours/Day',
+                    '${(_statistics['avgHours'] ?? 0).toStringAsFixed(2)}',
+                  ),
+                  _buildPdfTableRow(
+                    'Late Arrivals',
+                    '${_statistics['lateArrivals']}',
+                  ),
+                  _buildPdfTableRow(
+                    'Total Late Hours',
+                    '${(_statistics['totalLateHours'] ?? 0).toStringAsFixed(2)}',
+                  ),
+                  _buildPdfTableRow(
+                    'Punctuality Rate',
+                    '${(_statistics['punctualityRate'] ?? 0).toStringAsFixed(1)}%',
+                  ),
+                  _buildPdfTableRow(
+                    'Total Distance',
+                    '${(_statistics['totalDistance'] ?? 0).toStringAsFixed(2)} km',
+                  ),
+                  _buildPdfTableRow(
+                    'Average Distance/Day',
+                    '${(_statistics['avgDistance'] ?? 0).toStringAsFixed(2)} km',
+                  ),
                 ],
               ),
               pw.SizedBox(height: 20),
-              pw.Text('Detailed Records', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Detailed Records',
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 10),
               pw.Table(
                 border: pw.TableBorder.all(),
@@ -985,25 +1208,130 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                   pw.TableRow(
                     decoration: pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
-                      pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
-                      pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('Login', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
-                      pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('Logout', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
-                      pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('Hours', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
-                      pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('Late', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
-                      pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('Distance', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
-                      pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('Status', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          'Date',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          'Login',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          'Logout',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          'Hours',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          'Late',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          'Distance',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          'Status',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   ..._records.map((record) {
                     return pw.TableRow(
                       children: [
-                        pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text(record.date, style: pw.TextStyle(fontSize: 7))),
-                        pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text(record.inTime ?? '—', style: pw.TextStyle(fontSize: 7))),
-                        pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text(record.outTime ?? '—', style: pw.TextStyle(fontSize: 7))),
-                        pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('${record.totHrs.toStringAsFixed(1)}', style: pw.TextStyle(fontSize: 7))),
-                        pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('${record.lateHrs.toStringAsFixed(1)}', style: pw.TextStyle(fontSize: 7))),
-                        pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text('${record.totalDistanceTraveled.toStringAsFixed(1)}', style: pw.TextStyle(fontSize: 7))),
-                        pw.Padding(padding: pw.EdgeInsets.all(4), child: pw.Text(record.type1, style: pw.TextStyle(fontSize: 7))),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            record.date,
+                            style: pw.TextStyle(fontSize: 7),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            record.inTime ?? '—',
+                            style: pw.TextStyle(fontSize: 7),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            record.outTime ?? '—',
+                            style: pw.TextStyle(fontSize: 7),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            '${record.totHrs.toStringAsFixed(1)}',
+                            style: pw.TextStyle(fontSize: 7),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            '${record.lateHrs.toStringAsFixed(1)}',
+                            style: pw.TextStyle(fontSize: 7),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            '${record.totalDistanceTraveled.toStringAsFixed(1)}',
+                            style: pw.TextStyle(fontSize: 7),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            record.type1,
+                            style: pw.TextStyle(fontSize: 7),
+                          ),
+                        ),
                       ],
                     );
                   }).toList(),
@@ -1014,13 +1342,19 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         ),
       );
 
-      final output = await getTemporaryDirectory();
-      final file = File('${output.path}/attendance_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf');
-      await file.writeAsBytes(await pdf.save());
-      
-      await Printing.sharePdf(bytes: await pdf.save(), filename: 'attendance_report_$_userName.pdf');
+      // Save as bytes
+      final bytes = await pdf.save();
 
-      _showSuccess('PDF generated successfully');
+      // WEB DOWNLOAD — IMPORTANT
+      final blob = html.Blob([bytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..download =
+            "attendance_report_${DateTime.now().millisecondsSinceEpoch}.pdf"
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      _showSuccess("PDF downloaded successfully");
     } catch (e) {
       _showError('Failed to generate PDF: $e');
     }
@@ -1029,8 +1363,14 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   pw.TableRow _buildPdfTableRow(String label, String value) {
     return pw.TableRow(
       children: [
-        pw.Padding(padding: pw.EdgeInsets.all(8), child: pw.Text(label, style: pw.TextStyle(fontSize: 10))),
-        pw.Padding(padding: pw.EdgeInsets.all(8), child: pw.Text(value, style: pw.TextStyle(fontSize: 10))),
+        pw.Padding(
+          padding: pw.EdgeInsets.all(8),
+          child: pw.Text(label, style: pw.TextStyle(fontSize: 10)),
+        ),
+        pw.Padding(
+          padding: pw.EdgeInsets.all(8),
+          child: pw.Text(value, style: pw.TextStyle(fontSize: 10)),
+        ),
       ],
     );
   }
@@ -1038,8 +1378,16 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   Future<void> _exportAsCsv() async {
     try {
       final csv = _generateCsv();
-      await Clipboard.setData(ClipboardData(text: csv));
-      _showSuccess('CSV copied to clipboard (${_records.length} records)');
+      // WEB DOWNLOAD — IMPORTANT
+      final blob = html.Blob([csv], 'text/csv');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..download =
+            "attendance_report_${DateTime.now().millisecondsSinceEpoch}.csv"
+        ..click();
+      html.Url.revokeObjectUrl(url);
+      _showSuccess('CSV downloaded successfully (${_records.length} records)');
+
     } catch (e) {
       _showError('Failed to export CSV: $e');
     }
@@ -1060,10 +1408,10 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
       'Distance (km)',
       'Status',
     ];
-    
+
     final sb = StringBuffer();
     sb.writeln(headers.join(','));
-    
+
     for (final record in _records) {
       final row = [
         '"${record.date}"',
@@ -1081,22 +1429,23 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
       ];
       sb.writeln(row.join(','));
     }
-    
+
     return sb.toString();
   }
 
   Future<void> _shareReport() async {
     try {
       final csv = _generateCsv();
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/attendance_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
-      await file.writeAsString(csv);
-      
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Attendance Report - ${DateFormat('dd MMM yyyy').format(_dateRange!.start)} to ${DateFormat('dd MMM yyyy').format(_dateRange!.end)}',
-        text: 'Please find attached attendance report for $_userName.',
-      );
+      // web share via temporary file
+      final bytes = utf8.encode(csv);
+      final blob = html.Blob([bytes], 'text/csv');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..download =
+            "attendance_report_${DateTime.now().millisecondsSinceEpoch}.csv"
+        ..click();
+      html.Url.revokeObjectUrl(url);
+      _showSuccess('CSV shared successfully (${_records.length} records)');
     } catch (e) {
       _showError('Failed to share report: $e');
     }
@@ -1105,7 +1454,7 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   Future<void> _printReport() async {
     try {
       final pdf = pw.Document();
-      
+
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
@@ -1117,16 +1466,34 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('Attendance Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                    pw.Text(
+                      'Attendance Report',
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
                     pw.SizedBox(height: 8),
-                    pw.Text('Employee: $_userName | ID: $_empId', style: pw.TextStyle(fontSize: 12)),
-                    pw.Text('Period: ${DateFormat('dd MMM yyyy').format(_dateRange!.start)} - ${DateFormat('dd MMM yyyy').format(_dateRange!.end)}', style: pw.TextStyle(fontSize: 12)),
+                    pw.Text(
+                      'Employee: $_userName | ID: $_empId',
+                      style: pw.TextStyle(fontSize: 12),
+                    ),
+                    pw.Text(
+                      'Period: ${DateFormat('dd MMM yyyy').format(_dateRange!.start)} - ${DateFormat('dd MMM yyyy').format(_dateRange!.end)}',
+                      style: pw.TextStyle(fontSize: 12),
+                    ),
                     pw.Divider(),
                   ],
                 ),
               ),
               pw.SizedBox(height: 20),
-              pw.Text('Summary Statistics', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Summary Statistics',
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 10),
               pw.Table(
                 border: pw.TableBorder.all(),
@@ -1134,15 +1501,42 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                   pw.TableRow(
                     decoration: pw.BoxDecoration(color: PdfColors.grey300),
                     children: [
-                      pw.Padding(padding: pw.EdgeInsets.all(8), child: pw.Text('Metric', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: pw.EdgeInsets.all(8), child: pw.Text('Value', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Metric',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: pw.EdgeInsets.all(8),
+                        child: pw.Text(
+                          'Value',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                      ),
                     ],
                   ),
-                  _buildPdfTableRow('Working Days', '${_statistics['workingDays']}'),
-                  _buildPdfTableRow('Total Hours', '${(_statistics['totalHours'] ?? 0).toStringAsFixed(2)}'),
-                  _buildPdfTableRow('Average Hours', '${(_statistics['avgHours'] ?? 0).toStringAsFixed(2)}'),
-                  _buildPdfTableRow('Late Arrivals', '${_statistics['lateArrivals']}'),
-                  _buildPdfTableRow('Total Distance', '${(_statistics['totalDistance'] ?? 0).toStringAsFixed(2)} km'),
+                  _buildPdfTableRow(
+                    'Working Days',
+                    '${_statistics['workingDays']}',
+                  ),
+                  _buildPdfTableRow(
+                    'Total Hours',
+                    '${(_statistics['totalHours'] ?? 0).toStringAsFixed(2)}',
+                  ),
+                  _buildPdfTableRow(
+                    'Average Hours',
+                    '${(_statistics['avgHours'] ?? 0).toStringAsFixed(2)}',
+                  ),
+                  _buildPdfTableRow(
+                    'Late Arrivals',
+                    '${_statistics['lateArrivals']}',
+                  ),
+                  _buildPdfTableRow(
+                    'Total Distance',
+                    '${(_statistics['totalDistance'] ?? 0).toStringAsFixed(2)} km',
+                  ),
                 ],
               ),
             ];
@@ -1150,7 +1544,9 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         ),
       );
 
-      await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
     } catch (e) {
       _showError('Failed to print report: $e');
     }

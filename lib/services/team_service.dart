@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vevij/models/tasks/team_model.dart';
-
+import 'package:vevij/services/notification_service.dart';
 class TeamService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -30,10 +30,16 @@ class TeamService {
             .toList());
   }
 
-  // Create new team
+  // Create new team 
   Future<void> createTeam(TeamModel team) async {
     try {
       await _firestore.collection('teams').doc(team.id).set(team.toMap());
+      // Send notifications to team members
+    await NotificationService().sendTeamCreationNotification(
+      memberIds: team.memberIds,
+      teamName: team.name,
+      teamId: team.id,
+    );
     } catch (e) {
       throw Exception('Failed to create team: $e');
     }
@@ -64,6 +70,15 @@ class TeamService {
         'memberIds': FieldValue.arrayUnion([userId]),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       });
+      // Send notification to new member
+    final team = await getTeam(teamId);
+    if (team != null) {
+      await NotificationService().sendTeamCreationNotification(
+        memberIds: [userId],
+        teamName: team.name,
+        teamId: teamId,
+      );
+    }
     } catch (e) {
       throw Exception('Failed to add team member: $e');
     }
@@ -72,10 +87,19 @@ class TeamService {
   // Remove member from team
   Future<void> removeTeamMember(String teamId, String userId) async {
     try {
+      final team = await getTeam(teamId);
       await _firestore.collection('teams').doc(teamId).update({
         'memberIds': FieldValue.arrayRemove([userId]),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       });
+      // Send notification to removed member
+    if (team != null) {
+      await NotificationService().sendTeamMemberRemovedNotification(
+        removedUserId: userId,
+        teamName: team.name,
+        teamId: teamId,
+      );
+    }
     } catch (e) {
       throw Exception('Failed to remove team member: $e');
     }

@@ -1,19 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum TaskStatus {
-  pending,
-  inProgress,
-  completed,
-  cancelled,
-}
+enum TaskStatus { pending, inProgress, completed, cancelled }
 
-enum TaskPriority {
-  low,
-  medium,
-  high,
-  urgent,
-  critical
-}
+enum TaskPriority { low, medium, high, urgent, critical }
 
 enum TaskCategory {
   general,
@@ -31,13 +20,14 @@ enum TaskCategory {
   bug,
   improvement,
 }
+
 class TaskModel {
   final String id;
   final String title;
   final String description;
   final String assignedTeamId;
   final List<String> assignedTo; // Performers
-  final List<String> monitors;   // Monitors
+  final List<String> monitors; // Monitors
   final String createdBy;
   final TaskStatus status;
   final TaskPriority priority;
@@ -85,7 +75,9 @@ class TaskModel {
       'priority': priority.name,
       'category': category.name, // Added to map
       'dueDate': Timestamp.fromDate(dueDate),
-      'revisedDueDate': revisedDueDate != null ? Timestamp.fromDate(revisedDueDate!) : null,
+      'revisedDueDate': revisedDueDate != null
+          ? Timestamp.fromDate(revisedDueDate!)
+          : null,
       'estimatedHours': estimatedHours, // Added to map
       'actualHours': actualHours, // Added to map
       'attachments': attachments,
@@ -117,11 +109,14 @@ class TaskModel {
         orElse: () => TaskCategory.general,
       ),
       dueDate: _toDateTime(map['dueDate'], fallback: DateTime.now()),
-      revisedDueDate: map['revisedDueDate'] != null 
+      revisedDueDate: map['revisedDueDate'] != null
           ? _toDateTime(map['revisedDueDate'])
           : null,
-      estimatedHours: (map['estimatedHours'] ?? 0.0).toDouble(), // Parse estimated hours
-      actualHours: map['actualHours'] != null ? (map['actualHours'] as num).toDouble() : null, // Parse actual hours
+      estimatedHours: (map['estimatedHours'] ?? 0.0)
+          .toDouble(), // Parse estimated hours
+      actualHours: map['actualHours'] != null
+          ? (map['actualHours'] as num).toDouble()
+          : null, // Parse actual hours
       attachments: _toStringList(map['attachments']),
       watchers: _toStringList(map['watchers']),
       createdAt: _toDateTime(map['createdAt'], fallback: DateTime.now()),
@@ -172,7 +167,6 @@ class TaskModel {
   }
 }
 
-
 // Helper to safely convert a dynamic value coming from Firestore into List<String>.
 // Firestore sometimes stores single values as a String instead of a list; calling
 // `List.from` on a String throws `type 'String' is not a subtype of type 'Iterable'`.
@@ -180,14 +174,20 @@ List<String> _toStringList(dynamic value) {
   if (value == null) return <String>[];
   if (value is List) {
     // Ensure all entries are strings
-    return value.map((e) => e?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+    return value
+        .map((e) => e?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
   if (value is String) {
     return [value];
   }
   // If it's some other iterable (e.g., Iterable<dynamic>), try to convert
   if (value is Iterable) {
-    return value.map((e) => e?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+    return value
+        .map((e) => e?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
   return <String>[];
 }
@@ -213,7 +213,9 @@ DateTime _toDateTime(dynamic value, {DateTime? fallback}) {
     final seconds = value['_seconds'];
     final nanos = value['_nanoseconds'] ?? 0;
     if (seconds is int || seconds is num) {
-      return DateTime.fromMillisecondsSinceEpoch(seconds.toInt() * 1000 + (nanos ~/ 1000000));
+      return DateTime.fromMillisecondsSinceEpoch(
+        seconds.toInt() * 1000 + (nanos ~/ 1000000),
+      );
     }
   }
   if (value is num) return DateTime.fromMillisecondsSinceEpoch(value.toInt());

@@ -461,16 +461,22 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddMemberBottomSheet(
-        employees: _filteredEmployees,
-        searchQuery: _searchQuery,
-        onSearchChanged: _filterEmployees,
-        onMemberAdded: _addMember,
-        existingMembers: _members,
+      builder: (context) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setModalState) {
+          return _AddMemberBottomSheet(
+            employees: _filteredEmployees,
+            searchQuery: _searchQuery,
+            onSearchChanged: (query) {
+              _filterEmployees(query);
+              setModalState(() {}); // This triggers rebuild of the bottom sheet
+            },
+            onMemberAdded: _addMember,
+            existingMembers: _members,
+          );
+        },
       ),
     );
   }
-
   void _showRoleChangeDialog(TeamMember member) {
     final employee = _allEmployees.firstWhere(
       (emp) => emp.uid == member.userId,

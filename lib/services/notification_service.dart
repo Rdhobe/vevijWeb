@@ -1,4 +1,5 @@
 import 'package:vevij/components/imports.dart';
+import 'package:vevij/components/widgets/notification_popup_widget.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -10,6 +11,14 @@ class NotificationService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Global navigation key for showing popup overlays
+  GlobalKey<NavigatorState>? _navigatorKey;
+
+  /// Set the navigator key for showing popup notifications
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+  }
 
   // Initialize notification service
   Future<void> initialize() async {
@@ -40,7 +49,10 @@ class NotificationService {
       print('User granted permission');
 
       // Get FCM token and save to user document
-      String? token = await _firebaseMessaging.getToken();
+      String? token = await _firebaseMessaging.getToken(
+        vapidKey:
+            'BP04meoXQwoQDhHvT_E_TBVjcmhEUJCfBJKGcKDCA6F7k4ib9Y6YSj4JrJ1y4pxz1imzP-KvSA2gI_2XmO_cg7I', // ← Add your key here
+      );
       if (token != null && _auth.currentUser != null) {
         await _firestore.collection('users').doc(_auth.currentUser!.uid).update(
           {'fcmToken': token, 'tokenUpdatedAt': FieldValue.serverTimestamp()},
@@ -72,6 +84,9 @@ class NotificationService {
       if (initialMessage != null) {
         _handleMessageTap(initialMessage);
       }
+
+      // Listen to new notifications in Firestore for popup display
+      _listenToNotifications();
     }
   }
 
@@ -421,6 +436,337 @@ class NotificationService {
           },
         ),
       ),
+    );
+  }
+
+  // ========== TASK MANAGEMENT NOTIFICATIONS ==========
+
+  // Send notification when user is assigned to a task
+  Future<void> sendTaskAssignmentNotification({
+    required List<String> userIds,
+    required String taskTitle,
+    required String taskId,
+    String? assignedBy,
+  }) async {
+    for (String userId in userIds) {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'New Task Assigned',
+        'body': 'You have been assigned to task: $taskTitle',
+        'taskId': taskId,
+        'type': 'task_assignment',
+        'assignedBy': assignedBy ?? _auth.currentUser?.uid,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // Send notification when task is updated
+  Future<void> sendTaskUpdateNotification({
+    required List<String> userIds,
+    required String taskTitle,
+    required String taskId,
+    required String updateType,
+  }) async {
+    for (String userId in userIds) {
+      if (userId != _auth.currentUser?.uid) {
+        await _firestore.collection('notifications').add({
+          'userId': userId,
+          'title': 'Task Updated',
+          'body': 'Task "$taskTitle" has been updated ($updateType)',
+          'taskId': taskId,
+          'type': 'task_update',
+          'updatedBy': _auth.currentUser?.uid,
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  }
+
+  // Send notification for new task comment
+  Future<void> sendTaskCommentNotification({
+    required List<String> userIds,
+    required String taskTitle,
+    required String taskId,
+    required String commenterName,
+    required String comment,
+  }) async {
+    for (String userId in userIds) {
+      if (userId != _auth.currentUser?.uid) {
+        await _firestore.collection('notifications').add({
+          'userId': userId,
+          'title': 'New Comment on $taskTitle',
+          'body': '$commenterName: $comment',
+          'taskId': taskId,
+          'type': 'task_comment',
+          'commentedBy': _auth.currentUser?.uid,
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  }
+
+  // Send notification when task due date changes
+  Future<void> sendTaskDueDateChangeNotification({
+    required List<String> userIds,
+    required String taskTitle,
+    required String taskId,
+    required String newDueDate,
+  }) async {
+    for (String userId in userIds) {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'Due Date Updated',
+        'body': 'Task "$taskTitle" due date has been changed to $newDueDate',
+        'taskId': taskId,
+        'type': 'task_due_date_change',
+        'updatedBy': _auth.currentUser?.uid,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // Send notification when task status changes
+  Future<void> sendTaskStatusChangeNotification({
+    required List<String> userIds,
+    required String taskTitle,
+    required String taskId,
+    required String newStatus,
+  }) async {
+    for (String userId in userIds) {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'Task Status Changed',
+        'body': 'Task "$taskTitle" status changed to $newStatus',
+        'taskId': taskId,
+        'type': 'task_status_change',
+        'updatedBy': _auth.currentUser?.uid,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // Send notification when task is deleted
+  Future<void> sendTaskDeletionNotification({
+    required List<String> userIds,
+    required String taskTitle,
+  }) async {
+    for (String userId in userIds) {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'Task Deleted',
+        'body': 'Task "$taskTitle" has been deleted',
+        'type': 'task_deletion',
+        'deletedBy': _auth.currentUser?.uid,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // ========== TEAM MANAGEMENT NOTIFICATIONS ==========
+
+  // Send notification when team is created
+  Future<void> sendTeamCreationNotification({
+    required List<String> memberIds,
+    required String teamName,
+    required String teamId,
+  }) async {
+    for (String userId in memberIds) {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'Added to Team',
+        'body': 'You have been added to team: $teamName',
+        'teamId': teamId,
+        'type': 'team_creation',
+        'createdBy': _auth.currentUser?.uid,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // Send notification when member is added to team
+  Future<void> sendTeamMemberAddedNotification({
+    required List<String> existingMemberIds,
+    required String newMemberName,
+    required String teamName,
+    required String teamId,
+  }) async {
+    for (String userId in existingMemberIds) {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': 'New Team Member',
+        'body': '$newMemberName has joined team: $teamName',
+        'teamId': teamId,
+        'type': 'team_member_added',
+        'addedBy': _auth.currentUser?.uid,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // Send notification when member is removed from team
+  Future<void> sendTeamMemberRemovedNotification({
+    required String removedUserId,
+    required String teamName,
+    required String teamId,
+  }) async {
+    await _firestore.collection('notifications').add({
+      'userId': removedUserId,
+      'title': 'Removed from Team',
+      'body': 'You have been removed from team: $teamName',
+      'teamId': teamId,
+      'type': 'team_member_removed',
+      'removedBy': _auth.currentUser?.uid,
+      'read': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Send notification when team is updated
+  Future<void> sendTeamUpdateNotification({
+    required List<String> memberIds,
+    required String teamName,
+    required String teamId,
+    required String updateType,
+  }) async {
+    for (String userId in memberIds) {
+      if (userId != _auth.currentUser?.uid) {
+        await _firestore.collection('notifications').add({
+          'userId': userId,
+          'title': 'Team Updated',
+          'body': 'Team "$teamName" has been updated ($updateType)',
+          'teamId': teamId,
+          'type': 'team_update',
+          'updatedBy': _auth.currentUser?.uid,
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  }
+
+  // Listen to notifications and show popups
+  void _listenToNotifications() {
+    if (_auth.currentUser == null) return;
+
+    _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: _auth.currentUser!.uid)
+        .where('read', isEqualTo: false)
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .snapshots()
+        .listen((snapshot) {
+          for (var change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final data = change.doc.data();
+              if (data != null) {
+                _showNotificationPopup(data, change.doc.id);
+              }
+            }
+          }
+        });
+  }
+
+  // Show notification popup
+  void _showNotificationPopup(
+    Map<String, dynamic> data,
+    String notificationId,
+  ) {
+    if (_navigatorKey == null || _navigatorKey!.currentContext == null) {
+      print('Cannot show notification popup: Navigator key not set');
+      return;
+    }
+
+    final context = _navigatorKey!.currentContext!;
+    final type = data['type'] as String?;
+    final title = data['title'] as String? ?? 'New Notification';
+    final body = data['body'] as String? ?? '';
+    final taskId = data['taskId'] as String?;
+    final teamId = data['teamId'] as String?;
+
+    // Determine notification type
+    NotificationType notificationType;
+    switch (type) {
+      case 'task_assignment':
+        notificationType = NotificationType.taskAssignment;
+        break;
+      case 'task_update':
+        notificationType = NotificationType.taskUpdate;
+        break;
+      case 'task_comment':
+        notificationType = NotificationType.taskComment;
+        break;
+      case 'task_status_change':
+        notificationType = NotificationType.taskStatusChange;
+        break;
+      case 'task_due_date_change':
+        notificationType = NotificationType.taskDueDateChange;
+        break;
+      case 'task_deletion':
+        notificationType = NotificationType.taskDeletion;
+        break;
+      case 'team_creation':
+        notificationType = NotificationType.teamCreation;
+        break;
+      case 'team_update':
+        notificationType = NotificationType.teamUpdate;
+        break;
+      case 'team_member_added':
+        notificationType = NotificationType.teamMemberAdded;
+        break;
+      case 'team_member_removed':
+        notificationType = NotificationType.teamMemberRemoved;
+        break;
+      default:
+        notificationType = NotificationType.general;
+    }
+
+    // Show popup
+    NotificationPopupManager.instance.show(
+      context: context,
+      title: title,
+      message: body,
+      type: notificationType,
+      onTap: () {
+        // Navigate to task or team details
+        if (taskId != null) {
+          // TODO: Navigate to task details
+          print('Navigate to task: $taskId');
+        } else if (teamId != null) {
+          // TODO: Navigate to team details
+          print('Navigate to team: $teamId');
+        }
+
+        // Mark as read
+        markNotificationAsRead(notificationId);
+      },
+      actions: [
+        if (taskId != null)
+          NotificationAction(
+            label: 'View Task',
+            onPressed: () {
+              print('View task: $taskId');
+              markNotificationAsRead(notificationId);
+            },
+          ),
+        if (teamId != null)
+          NotificationAction(
+            label: 'View Team',
+            onPressed: () {
+              print('View team: $teamId');
+              markNotificationAsRead(notificationId);
+            },
+          ),
+      ],
     );
   }
 

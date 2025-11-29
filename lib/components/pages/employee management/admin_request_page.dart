@@ -1,33 +1,54 @@
 import 'package:intl/intl.dart';
 import 'package:vevij/components/imports.dart';
 
-
 // Modern Purple Theme
 
 class AdminRequestManagementPage extends StatefulWidget {
   const AdminRequestManagementPage({super.key});
 
   @override
-  State<AdminRequestManagementPage> createState() => _AdminRequestManagementPageState();
+  State<AdminRequestManagementPage> createState() =>
+      _AdminRequestManagementPageState();
 }
 
-class _AdminRequestManagementPageState extends State<AdminRequestManagementPage> {
+class _AdminRequestManagementPageState
+    extends State<AdminRequestManagementPage> {
   String _selectedFilter = 'all';
   String _selectedRequestType = 'all';
   String _searchQuery = '';
 
   final List<Map<String, dynamic>> _filters = [
-    {'value': 'all', 'label': 'All Requests', 'icon': Icons.filter_list_rounded},
-    {'value': 'pending', 'label': 'Pending', 'icon': Icons.pending_actions_rounded},
-    {'value': 'approved', 'label': 'Approved', 'icon': Icons.check_circle_rounded},
+    {
+      'value': 'all',
+      'label': 'All Requests',
+      'icon': Icons.filter_list_rounded,
+    },
+    {
+      'value': 'pending',
+      'label': 'Pending',
+      'icon': Icons.pending_actions_rounded,
+    },
+    {
+      'value': 'approved',
+      'label': 'Approved',
+      'icon': Icons.check_circle_rounded,
+    },
     {'value': 'rejected', 'label': 'Rejected', 'icon': Icons.cancel_rounded},
   ];
 
   final List<Map<String, dynamic>> _requestTypes = [
     {'value': 'all', 'label': 'All Types', 'icon': Icons.category_rounded},
     {'value': 'leave', 'label': 'Leave', 'icon': Icons.event_note_rounded},
-    {'value': 'profile_update', 'label': 'Profile', 'icon': Icons.person_rounded},
-    {'value': 'mis_punch', 'label': 'Mis-Punch', 'icon': Icons.fingerprint_rounded},
+    {
+      'value': 'profile_update',
+      'label': 'Profile',
+      'icon': Icons.person_rounded,
+    },
+    {
+      'value': 'mis_punch',
+      'label': 'Mis-Punch',
+      'icon': Icons.fingerprint_rounded,
+    },
   ];
 
   @override
@@ -36,10 +57,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
       appBar: AppBar(
         title: Text(
           'Request Management',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
         centerTitle: false,
         elevation: 0,
@@ -61,9 +79,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
           _buildStatistics(),
           SizedBox(height: 8),
           // Requests List
-          Expanded(
-            child: _buildRequestsList(),
-          ),
+          Expanded(child: _buildRequestsList()),
         ],
       ),
     );
@@ -184,7 +200,11 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
               color: AppTheme.palePurple,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.tune_rounded, color: AppTheme.primaryPurple, size: 20),
+            child: Icon(
+              Icons.tune_rounded,
+              color: AppTheme.primaryPurple,
+              size: 20,
+            ),
           ),
         ),
       ],
@@ -203,7 +223,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
         }
 
         final pendingCount = snapshot.data!.docs.length;
-        
+
         return Container(
           margin: EdgeInsets.symmetric(horizontal: 16),
           padding: EdgeInsets.all(16),
@@ -228,7 +248,11 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.notifications_active_rounded, color: Colors.white, size: 24),
+                child: Icon(
+                  Icons.notifications_active_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
               SizedBox(width: 12),
               Expanded(
@@ -294,15 +318,42 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
         }
 
         var requests = snapshot.data!.docs;
-        
+
+        // Apply local request type filter
+        if (_selectedRequestType != 'all') {
+          requests = requests.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['requestType'] == _selectedRequestType;
+          }).toList();
+        }
+
+        // Apply local search filter
+        if (_searchQuery.isNotEmpty) {
+          requests = requests.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final employeeName = (data['employeeName'] ?? '')
+                .toString()
+                .toLowerCase();
+            final searchLower = _searchQuery.toLowerCase();
+            return employeeName.contains(searchLower);
+          }).toList();
+        }
+
+        // Check if no requests after filtering
+        if (requests.isEmpty) {
+          return _buildEmptyState();
+        }
+
         // Sort requests: pending first, then by date
         requests.sort((a, b) {
           final aData = a.data() as Map<String, dynamic>;
           final bData = b.data() as Map<String, dynamic>;
-          
-          if (aData['status'] == 'pending' && bData['status'] != 'pending') return -1;
-          if (aData['status'] != 'pending' && bData['status'] == 'pending') return 1;
-          
+
+          if (aData['status'] == 'pending' && bData['status'] != 'pending')
+            return -1;
+          if (aData['status'] != 'pending' && bData['status'] == 'pending')
+            return 1;
+
           final aDate = (aData['createdAt'] as Timestamp).toDate();
           final bDate = (bData['createdAt'] as Timestamp).toDate();
           return bDate.compareTo(aDate);
@@ -314,7 +365,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
           itemBuilder: (context, index) {
             var request = requests[index];
             var data = request.data() as Map<String, dynamic>;
-            
+
             return _buildRequestCard(request.id, data);
           },
         );
@@ -324,7 +375,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
 
   Widget _buildRequestCard(String requestId, Map<String, dynamic> data) {
     final isPending = data['status'] == 'pending';
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -380,7 +431,11 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
               SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.schedule_rounded, size: 12, color: Colors.grey[500]),
+                  Icon(
+                    Icons.schedule_rounded,
+                    size: 12,
+                    color: Colors.grey[500],
+                  ),
                   SizedBox(width: 4),
                   Text(
                     'Applied: ${data['appliedDate']}',
@@ -462,22 +517,37 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildDetailSection('Leave Information', [
-          _buildDetailRow(Icons.category_rounded, 'Leave Type', _formatLeaveType(data['leaveType'])),
+          _buildDetailRow(
+            Icons.category_rounded,
+            'Leave Type',
+            _formatLeaveType(data['leaveType']),
+          ),
           _buildDetailRow(Icons.event_rounded, 'Start Date', data['startDate']),
           _buildDetailRow(Icons.event_rounded, 'End Date', data['endDate']),
-          _buildDetailRow(Icons.access_time_rounded, 'Duration', '${data['duration']} day(s)'),
-          _buildDetailRow(Icons.schedule_rounded, 'Sub Type', data['subType']?.toUpperCase()),
+          _buildDetailRow(
+            Icons.access_time_rounded,
+            'Duration',
+            '${data['duration']} day(s)',
+          ),
+          _buildDetailRow(
+            Icons.schedule_rounded,
+            'Sub Type',
+            data['subType']?.toUpperCase(),
+          ),
         ]),
         if (data['reason'] != null && data['reason'].toString().isNotEmpty) ...[
           SizedBox(height: 12),
-          _buildDetailSection('Reason', [
-            _buildTextDetail(data['reason']),
-          ]),
+          _buildDetailSection('Reason', [_buildTextDetail(data['reason'])]),
         ],
-        if (data['contactNumber'] != null && data['contactNumber'].toString().isNotEmpty) ...[
+        if (data['contactNumber'] != null &&
+            data['contactNumber'].toString().isNotEmpty) ...[
           SizedBox(height: 12),
           _buildDetailSection('Emergency Contact', [
-            _buildDetailRow(Icons.phone_rounded, 'Contact', data['contactNumber']),
+            _buildDetailRow(
+              Icons.phone_rounded,
+              'Contact',
+              data['contactNumber'],
+            ),
           ]),
         ],
       ],
@@ -486,20 +556,22 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
 
   Widget _buildProfileUpdateDetails(Map<String, dynamic> data) {
     Map<String, dynamic> updateData = data['updateData'] ?? {};
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildDetailSection('Updates Requested', 
-          updateData.entries.map((entry) => 
-            _buildDetailRow(Icons.edit_rounded, entry.key, entry.value)
-          ).toList(),
+        _buildDetailSection(
+          'Updates Requested',
+          updateData.entries
+              .map(
+                (entry) =>
+                    _buildDetailRow(Icons.edit_rounded, entry.key, entry.value),
+              )
+              .toList(),
         ),
         if (data['reason'] != null && data['reason'].toString().isNotEmpty) ...[
           SizedBox(height: 12),
-          _buildDetailSection('Reason', [
-            _buildTextDetail(data['reason']),
-          ]),
+          _buildDetailSection('Reason', [_buildTextDetail(data['reason'])]),
         ],
       ],
     );
@@ -511,17 +583,29 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
       children: [
         _buildDetailSection('Mis-Punch Information', [
           _buildDetailRow(Icons.calendar_today_rounded, 'Date', data['date']),
-          _buildDetailRow(Icons.touch_app_rounded, 'Issue Type', data['punchTypeLabel']),
-          if (data['correctInTime'] != null && data['correctInTime'].toString().isNotEmpty)
-            _buildDetailRow(Icons.login_rounded, 'In Time', data['correctInTime']),
-          if (data['correctOutTime'] != null && data['correctOutTime'].toString().isNotEmpty)
-            _buildDetailRow(Icons.logout_rounded, 'Out Time', data['correctOutTime']),
+          _buildDetailRow(
+            Icons.touch_app_rounded,
+            'Issue Type',
+            data['punchTypeLabel'],
+          ),
+          if (data['correctInTime'] != null &&
+              data['correctInTime'].toString().isNotEmpty)
+            _buildDetailRow(
+              Icons.login_rounded,
+              'In Time',
+              data['correctInTime'],
+            ),
+          if (data['correctOutTime'] != null &&
+              data['correctOutTime'].toString().isNotEmpty)
+            _buildDetailRow(
+              Icons.logout_rounded,
+              'Out Time',
+              data['correctOutTime'],
+            ),
         ]),
         if (data['reason'] != null && data['reason'].toString().isNotEmpty) ...[
           SizedBox(height: 12),
-          _buildDetailSection('Reason', [
-            _buildTextDetail(data['reason']),
-          ]),
+          _buildDetailSection('Reason', [_buildTextDetail(data['reason'])]),
         ],
       ],
     );
@@ -650,7 +734,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
     IconData icon;
     String message;
     Color color;
-    
+
     switch (status) {
       case 'approved':
         icon = Icons.check_circle_rounded;
@@ -667,7 +751,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
         message = 'Status unknown';
         color = Colors.grey;
     }
-    
+
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -714,7 +798,11 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
             SizedBox(height: 8),
             Text(
               'Notes: $adminNotes',
-              style: TextStyle(fontSize: 12, color: Colors.grey[700], fontStyle: FontStyle.italic),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[700],
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
         ],
@@ -722,16 +810,22 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
     );
   }
 
-  void _showApprovalDialog(String requestId, Map<String, dynamic> data, bool isApprove) {
+  void _showApprovalDialog(
+    String requestId,
+    Map<String, dynamic> data,
+    bool isApprove,
+  ) {
     TextEditingController notesController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(isApprove ? Icons.check_circle_rounded : Icons.cancel_rounded, 
-                color: isApprove ? Colors.green : Colors.red),
+            Icon(
+              isApprove ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              color: isApprove ? Colors.green : Colors.red,
+            ),
             SizedBox(width: 8),
             Text(isApprove ? 'Approve Request' : 'Reject Request'),
           ],
@@ -740,7 +834,9 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Are you sure you want to ${isApprove ? 'approve' : 'reject'} this request?'),
+            Text(
+              'Are you sure you want to ${isApprove ? 'approve' : 'reject'} this request?',
+            ),
             SizedBox(height: 16),
             TextField(
               controller: notesController,
@@ -760,8 +856,8 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
           ElevatedButton(
             onPressed: () {
               _updateRequestStatus(
-                requestId, 
-                data, 
+                requestId,
+                data,
                 isApprove ? 'approved' : 'rejected',
                 notesController.text.trim(),
               );
@@ -782,10 +878,10 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
   }
 
   Future<void> _updateRequestStatus(
-    String requestId, 
-    Map<String, dynamic> data, 
-    String status, 
-    String notes
+    String requestId,
+    Map<String, dynamic> data,
+    String status,
+    String notes,
   ) async {
     try {
       // get user name from data
@@ -796,21 +892,21 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
           .doc(FirebaseAuth.instance.currentUser?.uid)
           .get()
           .then((userSnapshot) {
-        if (userSnapshot.exists) {
-           String userName = userSnapshot.data()?['empName'] ?? 'Unknown';
-        }
-      });
+            if (userSnapshot.exists) {
+              String userName = userSnapshot.data()?['empName'] ?? 'Unknown';
+            }
+          });
 
       await FirebaseFirestore.instance
           .collection('employeeRequests')
           .doc(requestId)
           .update({
-        'status': status,
-        'processedBy': userName, // Replace with actual admin name
-        'processedAt': FieldValue.serverTimestamp(),
-        'adminNotes': notes,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'status': status,
+            'processedBy': userName, // Replace with actual admin name
+            'processedAt': FieldValue.serverTimestamp(),
+            'adminNotes': notes,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -858,10 +954,7 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
           SizedBox(height: 8),
           Text(
             'All requests are processed or no matching results',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
         ],
       ),
@@ -871,21 +964,13 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
   Stream<QuerySnapshot> _getRequestsStream() {
     Query query = FirebaseFirestore.instance.collection('employeeRequests');
 
-    // Apply status filter
+    // Apply status filter (only Firebase filter to avoid compound index requirement)
     if (_selectedFilter != 'all') {
       query = query.where('status', isEqualTo: _selectedFilter);
     }
 
-    // Apply request type filter
-    if (_selectedRequestType != 'all') {
-      query = query.where('requestType', isEqualTo: _selectedRequestType);
-    }
-
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      query = query.where('employeeName', isGreaterThanOrEqualTo: _searchQuery)
-                   .where('employeeName', isLessThan: _searchQuery + 'z');
-    }
+    // Note: Request type and search filtering are done client-side in _buildRequestsList()
+    // to avoid Firebase compound query limitations and composite index requirements
 
     return query.orderBy('createdAt', descending: true).snapshots();
   }
@@ -905,40 +990,59 @@ class _AdminRequestManagementPageState extends State<AdminRequestManagementPage>
 
   String _formatLeaveType(String? type) {
     switch (type) {
-      case 'sick': return 'Sick Leave';
-      case 'casual': return 'Casual Leave';
-      case 'emergency': return 'Emergency Leave';
-      case 'maternity': return 'Maternity Leave';
-      case 'paternity': return 'Paternity Leave';
-      case 'annual': return 'Annual Leave';
-      default: return 'Leave';
+      case 'sick':
+        return 'Sick Leave';
+      case 'casual':
+        return 'Casual Leave';
+      case 'emergency':
+        return 'Emergency Leave';
+      case 'maternity':
+        return 'Maternity Leave';
+      case 'paternity':
+        return 'Paternity Leave';
+      case 'annual':
+        return 'Annual Leave';
+      default:
+        return 'Leave';
     }
   }
 
   Color _getRequestTypeColor(String? type) {
     switch (type) {
-      case 'leave': return Color(0xFF3B82F6);
-      case 'profile_update': return Color(0xFF8B5CF6);
-      case 'mis_punch': return Color(0xFFF59E0B);
-      default: return Colors.grey;
+      case 'leave':
+        return Color(0xFF3B82F6);
+      case 'profile_update':
+        return Color(0xFF8B5CF6);
+      case 'mis_punch':
+        return Color(0xFFF59E0B);
+      default:
+        return Colors.grey;
     }
   }
 
   IconData _getRequestTypeIcon(String? type) {
     switch (type) {
-      case 'leave': return Icons.event_note_rounded;
-      case 'profile_update': return Icons.person_rounded;
-      case 'mis_punch': return Icons.fingerprint_rounded;
-      default: return Icons.help_rounded;
+      case 'leave':
+        return Icons.event_note_rounded;
+      case 'profile_update':
+        return Icons.person_rounded;
+      case 'mis_punch':
+        return Icons.fingerprint_rounded;
+      default:
+        return Icons.help_rounded;
     }
   }
 
   Color _getStatusColor(String? status) {
     switch (status) {
-      case 'pending': return Color(0xFFF59E0B);
-      case 'approved': return Color(0xFF10B981);
-      case 'rejected': return Color(0xFFEF4444);
-      default: return Colors.grey;
+      case 'pending':
+        return Color(0xFFF59E0B);
+      case 'approved':
+        return Color(0xFF10B981);
+      case 'rejected':
+        return Color(0xFFEF4444);
+      default:
+        return Colors.grey;
     }
   }
 }

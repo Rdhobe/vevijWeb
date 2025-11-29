@@ -24,7 +24,7 @@ class _EmployeeAttendancePageState extends State<EmployeeAttendancePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.employeeName} - Attendance'),
+        title: Text('${widget.employeeName}Attendance'),
       ),
       body: Column(
         children: [

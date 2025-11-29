@@ -7,6 +7,8 @@ import 'package:vevij/components/pages/task management/create_team_page.dart';
 import 'package:vevij/components/pages/task%20management/team_tasks_page.dart';
 import 'package:vevij/components/pages/task management/notifications_page.dart';
 import 'package:vevij/components/pages/task management/analytics_page.dart';
+import 'package:vevij/components/pages/task management/create_task_page.dart';
+
 
 class TeamListPage extends StatefulWidget {
   const TeamListPage({super.key});
@@ -26,7 +28,9 @@ class _TeamListPageState extends State<TeamListPage> {
     super.initState();
     _loadCurrentUser();
   }
-
+  bool get _canCreateTask {
+    return _isSuperAdminOrHr;
+  }
   Future<void> _loadCurrentUser() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -61,6 +65,19 @@ class _TeamListPageState extends State<TeamListPage> {
         );
       }
     }
+  }
+  Widget _buildFAB() {
+    return FloatingActionButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CreateTaskPage(),
+          ),
+        );
+      },
+      child: const Icon(Icons.add),
+    );
   }
 
   @override
@@ -127,6 +144,7 @@ class _TeamListPageState extends State<TeamListPage> {
         ],
       ),
       body: _buildTeamList(),
+      floatingActionButton: _canCreateTask ? _buildFAB() : null,
     );
   }
 
