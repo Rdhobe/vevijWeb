@@ -92,7 +92,7 @@ class _MenuPageState extends State<MenuPage> {
           _updateTotalUnreadCount(requestsCount: snapshot.docs.length);
         });
   }
-
+  
   int _personalUnread = 0;
   int _projectUnread = 0;
   int _requestsCount = 0;

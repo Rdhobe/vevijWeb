@@ -43,7 +43,7 @@ exports.sendChatNotification = functions.firestore
             .get();
 
         const senderData = senderDoc.data();
-        const senderName = senderData?.name || "Someone";
+        const senderName = senderData?.empName || "Someone";
 
         // Prepare notification payload
         const payload = {
@@ -357,7 +357,7 @@ exports.sendChatNotification = functions.firestore
             .get();
 
         const senderData = senderDoc.data();
-        const senderName = (senderData && senderData.name) || "Someone";
+        const senderName = (senderData && senderData.empName) || "Someone";
 
         // Prepare notification message using modern FCM API
         const messagePayload = {

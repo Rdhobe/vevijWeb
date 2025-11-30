@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:vevij/utils/app_colors.dart';
 import 'package:vevij/utils/app_theme.dart';
 import 'package:vevij/components/widgets/notification_popup_widget.dart';
-import 'package:vevij/components/widgets/task_card_modern.dart';
-import 'package:vevij/models/tasks/task_model.dart';
-import 'package:vevij/services/notification_service.dart';
+// import 'package:vevij/components/widgets/task_card_modern.dart';
+// import 'package:vevij/models/tasks/task_model.dart';
+// import 'package:vevij/services/notification_service.dart';
 
 /// Example integration demonstrating modern UI components
 ///
