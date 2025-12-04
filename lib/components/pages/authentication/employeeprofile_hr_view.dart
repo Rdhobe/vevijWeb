@@ -381,9 +381,24 @@ class _HRProfilePageState extends State<HRProfilePage> {
           ),
           Expanded(
             flex: 3,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            child: Row(
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              label == 'Email'
+                  ? IconButton(
+                      icon: const Icon(Icons.copy, size: 18),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: value));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Email copied to clipboard')),
+                        );
+                      },
+                    )
+                  : const SizedBox.shrink(),
+              ],
             ),
           ),
         ],

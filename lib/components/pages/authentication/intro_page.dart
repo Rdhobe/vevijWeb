@@ -32,14 +32,12 @@ class _IntroPageState extends State<IntroPage> {
         // Get cached user data
         final userData = await AuthService().getCachedUserData();
         final role = userData['userRole'];
-
         if (role != null && role.isNotEmpty) {
           // Navigate based on role
           _navigateByRole(role);
           return;
         }
       }
-
       // Not logged in or invalid session
       _navigateToLogin();
     } catch (e) {
@@ -49,7 +47,7 @@ class _IntroPageState extends State<IntroPage> {
     }
   }
 
-  void _navigateByRole(String role) {
+  void _navigateByRole(String role ) {
     if (!mounted) return;
      Navigator.pushReplacementNamed(context, '/layout');
   }

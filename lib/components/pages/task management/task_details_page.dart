@@ -32,6 +32,7 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
   bool _isEditingDueDate = false;
   DateTime? _tempDueDate;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String _displayName = '';
 
   // FIXED: Don't use Provider in property getters that are called during build
   bool _canEditTask(BuildContext context) {
@@ -60,8 +61,14 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
     super.initState();
     _task = widget.task;
     _tempDueDate = _task.dueDate;
+    _loadDisplayName();
+    
   }
-
+  Future<void> _loadDisplayName() async {
+    final userService = UserService();
+        final user = await userService.getUserById(_task.createdBy);
+    setState(() => _displayName = user?.empName ?? 'Unknown User');
+  }
   @override
   Widget build(BuildContext context) {
     final taskService = Provider.of<TaskService>(context);
@@ -198,7 +205,7 @@ class _TaskDetailsPageState extends State<TaskDetailsPage> {
             _InfoRow(
               icon: Icons.person,
               label: 'Created By',
-              value: _task.createdBy,
+              value: _displayName,
             ),
             
             // Created Date

@@ -53,33 +53,34 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _saveCredentials(String email) async {
-  final prefs = await SharedPreferences.getInstance();
-  
-  // Save remember me preference
-  await prefs.setBool('remember_me', _rememberMe);
-  
-  if (!_rememberMe) {
-    // If not remembering, clear saved profiles
-    await prefs.remove('saved_profiles');
-    await prefs.remove('last_used_email');
-    return;
+    final prefs = await SharedPreferences.getInstance();
+
+    // Save remember me preference
+    await prefs.setBool('remember_me', _rememberMe);
+
+    if (!_rememberMe) {
+      // If not remembering, clear saved profiles
+      await prefs.remove('saved_profiles');
+      await prefs.remove('last_used_email');
+      return;
+    }
+
+    final displayName = email.split('@')[0];
+    final profileString = '$email|||$displayName';
+
+    List<String> savedProfiles = prefs.getStringList('saved_profiles') ?? [];
+    savedProfiles.removeWhere((profile) => profile.startsWith('$email|||'));
+    savedProfiles.insert(0, profileString);
+
+    // Keep only last 5 profiles
+    if (savedProfiles.length > 5) {
+      savedProfiles = savedProfiles.take(5).toList();
+    }
+
+    await prefs.setStringList('saved_profiles', savedProfiles);
+    await prefs.setString('last_used_email', email);
   }
 
-  final displayName = email.split('@')[0];
-  final profileString = '$email|||$displayName';
-
-  List<String> savedProfiles = prefs.getStringList('saved_profiles') ?? [];
-  savedProfiles.removeWhere((profile) => profile.startsWith('$email|||'));
-  savedProfiles.insert(0, profileString);
-
-  // Keep only last 5 profiles
-  if (savedProfiles.length > 5) {
-    savedProfiles = savedProfiles.take(5).toList();
-  }
-
-  await prefs.setStringList('saved_profiles', savedProfiles);
-  await prefs.setString('last_used_email', email);
-}
   Future<void> _removeProfile(String email) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> savedProfiles = prefs.getStringList('saved_profiles') ?? [];
@@ -94,6 +95,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     });
   }
+
   String _getFirebaseErrorMessage(String errorCode) {
     switch (errorCode) {
       case 'user-not-found':
@@ -149,14 +151,15 @@ class _LoginPageState extends State<LoginPage> {
         await ErrorDialog.show(
           context,
           title: 'Location Permission Required',
-          message: 'Location permission is required for continuous monitoring. Please enable it in your device settings.',
+          message:
+              'Location permission is required for continuous monitoring. Please enable it in your device settings.',
         );
         setState(() {
           _isLoading = false;
         });
         return;
       }
-    
+
       // Sign in using email and password
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email.trim(),
@@ -175,27 +178,37 @@ class _LoginPageState extends State<LoginPage> {
           .doc(user!.uid)
           .get();
       final role = userData.data()?['designation'];
+      final status = userData.data()?['status'];
       // Initialize notifications after successful login
       await NotificationService.initialize();
-
+      
+      if (status != 'Active') {
+        await ErrorDialog.show(
+          context,
+          title: 'Account Inactive',
+          message:
+              'Your account is currently inactive. Please contact your administrator.',
+        );
+        return;
+      }
       if (role == null) {
         await ErrorDialog.show(
           context,
           title: 'Access Denied',
-          message: 'Your account role is not recognized. Please contact your administrator.',
+          message:
+              'Your account role is not recognized. Please contact your administrator.',
         );
         return;
       }
       if (role != null && role.isNotEmpty) {
         Navigator.pushReplacementNamed(context, '/layout');
       }
-
     } on FirebaseAuthException catch (e) {
       await ErrorDialog.show(
-  context,
-  title: 'Sign In Failed',
-  message: _getFirebaseErrorMessage(e.code),
-);
+        context,
+        title: 'Sign In Failed',
+        message: _getFirebaseErrorMessage(e.code),
+      );
     } catch (e) {
       await ErrorDialog.show(
         context,

@@ -17,6 +17,7 @@ class _PermissionManagementPageState extends State<PermissionManagementPage> {
   List<Employee> _filteredEmployees = [];
   Employee? _selectedEmployee;
   Map<EmployeePermission, bool> _permissionStates = {};
+  int _employeeCount = 0;
   bool _isLoading = false;
   bool _showPermissionsPage = false;
 
@@ -42,9 +43,10 @@ class _PermissionManagementPageState extends State<PermissionManagementPage> {
           .get();
 
       _allEmployees = querySnapshot.docs
+          .where((doc) => doc.data()['status'] == 'Active' && doc.data()['designation'] != 'Contractor') // status == Active and designation != 'Admin'
           .map((doc) => Employee.fromMap(doc.data()))
           .toList();
-      
+      _employeeCount = _allEmployees.length;
       _filteredEmployees = _allEmployees;
     } catch (e) {
       _showError('Failed to load employees: $e');
@@ -163,6 +165,19 @@ class _PermissionManagementPageState extends State<PermissionManagementPage> {
                 onPressed: _goBackToEmployeeList,
               )
             : null,
+        actions: !_showPermissionsPage
+            ? [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Center(
+                    child: Text(
+                      'Total Employees: $_employeeCount',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+              ]
+            : null,
       ),
       body: _showPermissionsPage 
           ? _buildPermissionPanel()
@@ -244,7 +259,7 @@ class _PermissionManagementPageState extends State<PermissionManagementPage> {
             const SizedBox(height: 4),
             Text('Employee Code: ${employee.empCode}'),
             Text('Department: ${employee.department}'),
-            Text('Current Role: ${employee.permissions.type}'),
+            Text('Designation: ${employee.designation}'),
           ],
         ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),

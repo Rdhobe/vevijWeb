@@ -30,6 +30,8 @@ class AuthService {
   String getCurrentUserId() {
     return _auth.currentUser!.uid;
   }
+  // get name of id 
+  
   // Save user session data
   Future<void> _saveUserSession(User user) async {
     try {
