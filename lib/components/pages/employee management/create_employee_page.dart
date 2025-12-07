@@ -46,11 +46,13 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
   String? _selectedStatus = 'Active';
   String? _selectedPaymentMode;
   String? _selectedShift;
+  String? _selectedWorkLocation;
 
   // Dropdown options
   final List<String> _titles = ['Mr', 'Mrs', 'Ms'];
   final List<String> _genders = ['Male', 'Female', 'Other'];
   List<String> _shifts = ['9:30AM to 6:30 PM','9:50AM to 6:50 PM'];
+  List<String> _Worklocation = ['office', 'site',];
   List<String> _designations = [];
   List<String> _departments = [];
   List<String> _branches = [];
@@ -204,6 +206,7 @@ void initState() {
       'email': email,
       'grade': _selectedGrade,
       'shift' : _selectedShift,
+      'workLocation': _selectedWorkLocation,
       'branch': _selectedBranch,
       'department': _selectedDepartment,
       'designation': _selectedDesignation,
@@ -548,21 +551,46 @@ void _resetForm() {
             validator: (value) => value == null ? 'Gender is required' : null,
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _selectedShift,
-            decoration: const InputDecoration(
-              labelText: 'shifts *',
-              border: OutlineInputBorder(),
-            ),
-            items: _shifts.map((shift) {
-              return DropdownMenuItem(value: shift , child: Text(shift));
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedShift = value;
-              });
-            },
-            validator: (value) => value == null ? 'shift is required' : null,
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedShift,
+                  decoration: const InputDecoration(
+                    labelText: 'shifts *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _shifts.map((shift) {
+                    return DropdownMenuItem(value: shift , child: Text(shift));
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedShift = value;
+                    });
+                  },
+                  validator: (value) => value == null ? 'shift is required' : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedWorkLocation,
+                  decoration: const InputDecoration(
+                    labelText: 'Work Location *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _Worklocation.map((location) {
+                    return DropdownMenuItem(value: location , child: Text(location));
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedWorkLocation = value;
+                    });
+                  },
+                  validator: (value) => value == null ? 'Work location is required' : null,
+                ),
+              ),
+            ],
           ),
         ],
       ),

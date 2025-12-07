@@ -97,6 +97,14 @@ class _HRProfilePageState extends State<HRProfilePage> {
                   'Birth Date',
                   widget.employeeData['birthDate'] ?? 'N/A',
                 ),
+                _buildInfoTile(
+                  'Shift',
+                  widget.employeeData['shift'] ?? 'N/A',
+                ),
+                _buildInfoTile(
+                  'Work Location',
+                  widget.employeeData['workLocation'] ?? 'N/A',
+                ),
               ],
             ),
             const SizedBox(height: 16),
