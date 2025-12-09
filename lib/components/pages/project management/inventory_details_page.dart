@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as flutter;
+
 class InventoryDetailsPage extends StatelessWidget {
   final String materialName;
   final int requiredQty;
   final int totalReceivedQty;
-  final int totalIssueQty;
+  final int totalIssuedQty;
   final String uom;
   final List receivedEntries;
   final List issuedEntries;
@@ -15,7 +16,7 @@ class InventoryDetailsPage extends StatelessWidget {
     required this.materialName,
     required this.requiredQty,
     required this.totalReceivedQty,
-    required this.totalIssueQty,
+    required this.totalIssuedQty,
     required this.uom,
     required this.receivedEntries,
     required this.issuedEntries,
@@ -25,7 +26,7 @@ class InventoryDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final balanceQty = requiredQty - totalReceivedQty;
-    final balIssueQty = totalReceivedQty - totalIssueQty;
+    final balIssueQty = totalReceivedQty - totalIssuedQty;
     final Color balanceColor = balanceQty <= 0 ? Colors.green : Colors.red;
     final Color issueBalanceColor = balIssueQty > 0 ? Colors.green : Colors.red;
 
@@ -67,17 +68,37 @@ class InventoryDetailsPage extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildSummaryItem('Required', '$requiredQty $uom', Colors.blue),
-                      _buildSummaryItem('Received', '$totalReceivedQty $uom', Colors.green),
-                      _buildSummaryItem('Issued', '$totalIssueQty $uom', Colors.orange),
+                      _buildSummaryItem(
+                        'Required',
+                        '$requiredQty $uom',
+                        Colors.blue,
+                      ),
+                      _buildSummaryItem(
+                        'Received',
+                        '$totalReceivedQty $uom',
+                        Colors.green,
+                      ),
+                      _buildSummaryItem(
+                        'Issued',
+                        '$totalIssuedQty $uom',
+                        Colors.orange,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildSummaryItem('Balance', '${balanceQty.abs()} $uom', balanceColor),
-                      _buildSummaryItem('Available', '$balIssueQty $uom', issueBalanceColor),
+                      _buildSummaryItem(
+                        'Balance',
+                        '${balanceQty.abs()} $uom',
+                        balanceColor,
+                      ),
+                      _buildSummaryItem(
+                        'Available',
+                        '$balIssueQty $uom',
+                        issueBalanceColor,
+                      ),
                     ],
                   ),
                 ],
@@ -88,18 +109,24 @@ class InventoryDetailsPage extends StatelessWidget {
 
             // Received History Section
             if (receivedEntries.isNotEmpty) ...[
-              _buildSectionHeader('Received History', Icons.input, Colors.green),
+              _buildSectionHeader(
+                'Received History',
+                Icons.input,
+                Colors.green,
+              ),
               const SizedBox(height: 12),
-              ...receivedEntries.map(
-                (entry) => _buildDetailedHistoryEntry(
-                  entry['challanNo'] ?? '',
-                  entry['date'] ?? '',
-                  entry['qty'] ?? 0,
-                  uom,
-                  Colors.green,
-                  null,
-                ),
-              ).toList(),
+              ...receivedEntries
+                  .map(
+                    (entry) => _buildDetailedHistoryEntry(
+                      entry['challanNo'] ?? '',
+                      entry['date'] ?? '',
+                      entry['qty'] ?? 0,
+                      uom,
+                      Colors.green,
+                      null,
+                    ),
+                  )
+                  .toList(),
               const SizedBox(height: 24),
             ],
 
@@ -107,16 +134,18 @@ class InventoryDetailsPage extends StatelessWidget {
             if (issuedEntries.isNotEmpty) ...[
               _buildSectionHeader('Issue History', Icons.output, Colors.orange),
               const SizedBox(height: 12),
-              ...issuedEntries.map(
-                (entry) => _buildDetailedHistoryEntry(
-                  entry['challanNo'] ?? '',
-                  entry['date'] ?? '',
-                  entry['qty'] ?? 0,
-                  uom,
-                  Colors.orange,
-                  entry['contractorName'],
-                ),
-              ).toList(),
+              ...issuedEntries
+                  .map(
+                    (entry) => _buildDetailedHistoryEntry(
+                      entry['challanNo'] ?? '',
+                      entry['date'] ?? '',
+                      entry['qty'] ?? 0,
+                      uom,
+                      Colors.orange,
+                      entry['contractorName'],
+                    ),
+                  )
+                  .toList(),
               const SizedBox(height: 24),
             ],
 
@@ -124,9 +153,9 @@ class InventoryDetailsPage extends StatelessWidget {
             if (editHistory.isNotEmpty) ...[
               _buildSectionHeader('Edit History', Icons.history, Colors.purple),
               const SizedBox(height: 12),
-              ...editHistory.map(
-                (edit) => _buildEditHistoryEntry(edit),
-              ).toList(),
+              ...editHistory
+                  .map((edit) => _buildEditHistoryEntry(edit))
+                  .toList(),
             ],
           ],
         ),
@@ -163,13 +192,7 @@ class InventoryDetailsPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }
@@ -202,10 +225,7 @@ class InventoryDetailsPage extends StatelessWidget {
               ),
               Text(
                 '$qty $uom',
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(color: color, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -233,7 +253,9 @@ class InventoryDetailsPage extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.purple.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
-        border: flutter.Border(left: BorderSide(width: 3, color: Colors.purple)),
+        border: flutter.Border(
+          left: BorderSide(width: 3, color: Colors.purple),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,4 +300,3 @@ class InventoryDetailsPage extends StatelessWidget {
     );
   }
 }
-

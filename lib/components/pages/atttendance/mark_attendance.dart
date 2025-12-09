@@ -79,8 +79,8 @@ class _MarkAttendancePageState extends State<MarkAttendancePage>
   DateTime? _lastTimerTick;
   
   // Office geofence settings
-  static const double officeLat = 18.510092;
-  static const double officeLng = 73.856724;
+  static const double officeLat = 18.50954783069657;
+  static const double officeLng = 73.87062867788329;
   static const double allowedRadiusMeters = 150;  // You can set 50–300 meters
   @override
   void initState() {

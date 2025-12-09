@@ -5,7 +5,6 @@ import 'package:excel/excel.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
 
-
 class ProjectDetailsPage extends StatefulWidget {
   final String projectId;
   final String projectName;
@@ -30,6 +29,23 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage>
   bool _isGenerating = false;
   bool isLoading = true;
   String _searchQuery = '';
+  final List<String> materialOrder = [
+    "MAIN DOOR FRAME",
+    "MAIN DOOR SHUTTER",
+    "BEDROOM DOOR SHUTTER",
+    "BEDROOM DOOR FRAME",
+    "TOILET DOOR SHUTTER",
+    "TOILET DOOR FRAME",
+    "DRY BALCONY DOOR FRAME",
+    "DRY BALCONY DOOR SHUTTER",
+    "ARCHITRAVE",
+    "HINGES",
+    "HINGES SCREW",
+    "FASTNER",
+    "10X75 SCREW",
+    "FOAM",
+    "FEVICOL",
+  ];
   @override
   void initState() {
     super.initState();
@@ -323,606 +339,625 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage>
           ),
 
           const SizedBox(height: 32),
-// Category-wise Inventory
-const Text(
-  'Category-wise Inventory',
-  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-),
-const SizedBox(height: 16),
-
-StreamBuilder<QuerySnapshot>(
-  stream: FirebaseFirestore.instance
-      .collection('projects')
-      .doc(widget.projectId)
-      .collection('inventory')
-      .snapshots(),
-  builder: (context, inventorySnapshot) {
-    if (!inventorySnapshot.hasData) {
-      return Center(child: CircularProgressIndicator());
-    }
-
-    // Group inventory by material name
-    Map<String, Map<String, dynamic>> inventoryStats = {};
-
-    for (var item in inventorySnapshot.data!.docs) {
-      final data = item.data() as Map<String, dynamic>;
-      final materialName = data['materialName'] ?? 'Unknown';
-      final receivedQty = data['receivedQty'] ?? 0;
-      final requiredQty = data['requiredQty'] ?? 0;
-      final usedQty = data['usedQty'] ?? 0;
-      final totalIssueQty = data['totalIssuedQty'] ?? 0;
-      final totalReceivedQty = data['totalReceivedQty'] ?? 0;
-      final balIssueQty = data['balIssueQty'] ?? 0;
-      final balanceQty = data['balanceQty'] ?? 0;
-      final uom = data['uom'] ?? 'PCS';
-
-      if (!inventoryStats.containsKey(materialName)) {
-        inventoryStats[materialName] = {
-          'receivedQty': 0,
-          'requiredQty': 0,
-          'usedQty': 0,
-          'totalIssuedQty': 0,
-          'totalReceivedQty': 0,
-          'balIssueQty': 0,
-          'balanceQty': 0,
-          'uom': uom,
-          'items': [], // Store individual inventory items for details
-        };
-      }
-
-      // Add item details for drilling down
-      inventoryStats[materialName]!['items'].add({
-        'id': item.id,
-        'data': data,
-      });
-
-      inventoryStats[materialName]!['receivedQty'] =
-          (inventoryStats[materialName]!['receivedQty'] ?? 0) + receivedQty;
-      inventoryStats[materialName]!['requiredQty'] =
-          (inventoryStats[materialName]!['requiredQty'] ?? 0) + requiredQty;
-      inventoryStats[materialName]!['usedQty'] =
-          (inventoryStats[materialName]!['usedQty'] ?? 0) + usedQty;
-      inventoryStats[materialName]!['totalIssuedQty'] =
-          (inventoryStats[materialName]!['totalIssuedQty'] ?? 0) + totalIssueQty;
-      inventoryStats[materialName]!['totalReceivedQty'] =
-          (inventoryStats[materialName]!['totalReceivedQty'] ?? 0) + totalReceivedQty;
-      inventoryStats[materialName]!['balIssueQty'] =
-          (inventoryStats[materialName]!['balIssueQty'] ?? 0) + balIssueQty;
-      inventoryStats[materialName]!['balanceQty'] =
-          (inventoryStats[materialName]!['balanceQty'] ?? 0) + balanceQty;
-    }
-
-    return Column(
-      children: inventoryStats.entries.map((entry) {
-        final materialName = entry.key;
-        final stats = entry.value;
-        final receivedQty = stats['receivedQty'] ?? 0;
-        final requiredQty = stats['requiredQty'] ?? 0;
-        final usedQty = stats['usedQty'] ?? 0;
-        final totalIssueQty = stats['totalIssuedQty'] ?? 0;
-        final totalReceivedQty = stats['totalReceivedQty'] ?? 0;
-        final balIssueQty = stats['balIssueQty'] ?? 0;
-        final balanceQty = stats['balanceQty'] ?? 0;
-        final uom = stats['uom'] ?? 'PCS';
-        final items = stats['items'] as List;
-        final availableQty = receivedQty - usedQty;
-        final usageRate = receivedQty > 0 ? (usedQty / receivedQty) : 0.0;
-        final fulfillmentRate = requiredQty > 0 ? (receivedQty / requiredQty) : 0.0;
-
-        return InkWell(
-          onTap: () => _showInventoryDetails(
-            context,
-            materialName,
-            items,
-            stats,
+          // Category-wise Inventory
+          const Text(
+            'Category-wise Inventory',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: flutter.Border.all(color: Colors.grey[200]!),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              materialName,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right,
-                            size: 20,
-                            color: Colors.grey[400],
+          const SizedBox(height: 16),
+
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('inventory')
+                .snapshots(),
+            builder: (context, inventorySnapshot) {
+              if (!inventorySnapshot.hasData) {
+                return Center(child: CircularProgressIndicator());
+              }
+
+              // Group inventory by material name
+              Map<String, Map<String, dynamic>> inventoryStats = {};
+
+              for (var item in inventorySnapshot.data!.docs) {
+                final data = item.data() as Map<String, dynamic>;
+                final materialName = data['materialName'] ?? 'Unknown';
+
+                // Calculate totals from entries (matching edit_inventory.dart logic)
+                final receivedEntries = (data['receivedEntries'] ?? []) as List;
+                final totalReceivedQty = receivedEntries.fold<int>(0, (
+                  acc,
+                  entry,
+                ) {
+                  return acc + ((entry['qty'] as int?) ?? 0);
+                });
+
+                final issuedEntries = (data['issuedEntries'] ?? []) as List;
+                final totalIssuedQty = issuedEntries.fold<int>(0, (acc, entry) {
+                  return acc + ((entry['qty'] as int?) ?? 0);
+                });
+
+                final requiredQty = data['requiredQty'] ?? 0;
+                final usedQty = data['usedQty'] ?? 0;
+                final balIssueQty = data['balIssueQty'] ?? 0;
+                final balanceQty = data['balanceQty'] ?? 0;
+                final uom = data['uom'] ?? 'PCS';
+
+                if (!inventoryStats.containsKey(materialName)) {
+                  inventoryStats[materialName] = {
+                    'requiredQty': 0,
+                    'usedQty': 0,
+                    'totalIssuedQty': 0,
+                    'totalReceivedQty': 0,
+                    'balIssueQty': 0,
+                    'balanceQty': 0,
+                    'uom': uom,
+                    'items': [], // Store individual inventory items for details
+                  };
+                }
+
+                // Add item details for drilling down
+                inventoryStats[materialName]!['items'].add({
+                  'id': item.id,
+                  'data': data,
+                });
+
+                inventoryStats[materialName]!['requiredQty'] =
+                    (inventoryStats[materialName]!['requiredQty'] ?? 0) +
+                    requiredQty;
+                inventoryStats[materialName]!['usedQty'] =
+                    (inventoryStats[materialName]!['usedQty'] ?? 0) + usedQty;
+                inventoryStats[materialName]!['totalIssuedQty'] =
+                    (inventoryStats[materialName]!['totalIssuedQty'] ?? 0) +
+                    totalIssuedQty;
+                inventoryStats[materialName]!['totalReceivedQty'] =
+                    (inventoryStats[materialName]!['totalReceivedQty'] ?? 0) +
+                    totalReceivedQty;
+                inventoryStats[materialName]!['balIssueQty'] =
+                    (inventoryStats[materialName]!['balIssueQty'] ?? 0) +
+                    balIssueQty;
+                inventoryStats[materialName]!['balanceQty'] =
+                    (inventoryStats[materialName]!['balanceQty'] ?? 0) +
+                    balanceQty;
+              }
+
+              return Column(
+                children: inventoryStats.entries.map((entry) {
+                  final materialName = entry.key;
+                  final stats = entry.value;
+                  final requiredQty = stats['requiredQty'] ?? 0;
+                  final usedQty = stats['usedQty'] ?? 0;
+                  final totalIssuedQty = stats['totalIssuedQty'] ?? 0;
+                  final totalReceivedQty = stats['totalReceivedQty'] ?? 0;
+                  final balIssueQty = stats['balIssueQty'] ?? 0;
+                  final balanceQty = stats['balanceQty'] ?? 0;
+                  final uom = stats['uom'] ?? 'PCS';
+                  final items = stats['items'] as List;
+                  final availableQty = totalReceivedQty - usedQty;
+                  final usageRate = totalReceivedQty > 0
+                      ? (usedQty / totalReceivedQty)
+                      : 0.0;
+                  final fulfillmentRate = requiredQty > 0
+                      ? (totalReceivedQty / requiredQty)
+                      : 0.0;
+
+                  return InkWell(
+                    onTap: () => _showInventoryDetails(
+                      context,
+                      materialName,
+                      items,
+                      stats,
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: flutter.Border.all(color: Colors.grey[200]!),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
                           ),
                         ],
                       ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: availableQty <= 0
-                            ? Colors.red[100]
-                            : availableQty < requiredQty * 0.2
-                            ? Colors.orange[100]
-                            : Colors.green[100],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        availableQty <= 0
-                            ? 'Out of Stock'
-                            : availableQty < requiredQty * 0.2
-                            ? 'Low Stock'
-                            : 'In Stock',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: availableQty <= 0
-                              ? Colors.red[700]
-                              : availableQty < requiredQty * 0.2
-                              ? Colors.orange[700]
-                              : Colors.green[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Usage Progress Bar
-                Row(
-                  children: [
-                    Text(
-                      'Usage: ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: usageRate,
-                        backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          usageRate > 0.8
-                              ? Colors.red
-                              : usageRate > 0.5
-                              ? Colors.orange
-                              : Colors.green,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${(usageRate * 100).toInt()}%',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: usageRate > 0.8
-                            ? Colors.red
-                            : usageRate > 0.5
-                            ? Colors.orange
-                            : Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                // Fulfillment Progress Bar
-                Row(
-                  children: [
-                    Text(
-                      'Fulfillment: ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: fulfillmentRate > 1.0 ? 1.0 : fulfillmentRate,
-                        backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          fulfillmentRate >= 1.0
-                              ? Colors.green
-                              : fulfillmentRate >= 0.5
-                              ? Colors.orange
-                              : Colors.red,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${(fulfillmentRate * 100).toInt()}%',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: fulfillmentRate >= 1.0
-                            ? Colors.green
-                            : fulfillmentRate >= 0.5
-                            ? Colors.orange
-                            : Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // Stats chips
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    _buildInventoryStatChip(
-                      'Required',
-                      '$requiredQty $uom',
-                      Color(0xFF3B82F6),
-                    ),
-                    _buildInventoryStatChip(
-                      'Received',
-                      '$receivedQty $uom',
-                      Colors.blue,
-                    ),
-                    _buildInventoryStatChip(
-                      'Used',
-                      '$usedQty $uom',
-                      Colors.green,
-                    ),
-                    _buildInventoryStatChip(
-                      'Available',
-                      '$availableQty $uom',
-                      availableQty <= 0 ? Colors.red : Colors.purple,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  },
-),
-          const SizedBox(height: 32),
-          // Installation Status by Category
-const Text(
-  'Installation Status by Category',
-  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-),
-const SizedBox(height: 16),
-
-StreamBuilder<QuerySnapshot>(
-  stream: FirebaseFirestore.instance
-      .collection('projects')
-      .doc(widget.projectId)
-      .collection('tasks')
-      .snapshots(),
-  builder: (context, tasksSnapshot) {
-    if (!tasksSnapshot.hasData) {
-      return Center(child: CircularProgressIndicator());
-    }
-
-    // Calculate installation status by material group
-    Map<String, Map<String, dynamic>> installationStats = {};
-
-    for (var task in tasksSnapshot.data!.docs) {
-      final data = task.data() as Map<String, dynamic>;
-      final materialGroup = data['materialGroup'] ?? 'Unknown';
-
-      if (!installationStats.containsKey(materialGroup)) {
-        installationStats[materialGroup] = {
-          'total': 0,
-          'doorFrameHardware': 0,
-          'architrave': 0,
-          'handover': 0,
-          'tasks': [], // Store task details for drilling down
-        };
-      }
-
-      // Add task details to the group
-      installationStats[materialGroup]!['tasks'].add({
-        'id': task.id,
-        'data': data,
-      });
-
-      installationStats[materialGroup]!['total'] =
-          installationStats[materialGroup]!['total']! +
-          ((data['qty'] ?? 1) as int);
-
-      // Check each installation phase completion based on boolean flags
-      if (data['doorFrameHardware'] == true) {
-        installationStats[materialGroup]!['doorFrameHardware'] =
-            installationStats[materialGroup]!['doorFrameHardware']! +
-            ((data['qty'] ?? 1) as int);
-      }
-      if (data['architrave'] == true) {
-        installationStats[materialGroup]!['architrave'] =
-            installationStats[materialGroup]!['architrave']! +
-            ((data['qty'] ?? 1) as int);
-      }
-      if (data['handover'] == true) {
-        installationStats[materialGroup]!['handover'] =
-            installationStats[materialGroup]!['handover']! +
-            ((data['qty'] ?? 1) as int);
-      }
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: flutter.Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Table Header
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    'Material Group',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    'Total',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Door+Frame\n+Hardware',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 10,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Architrave',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Handover',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Table Rows - Now clickable
-          ...installationStats.entries.map((entry) {
-            final materialGroup = entry.key;
-            final stats = entry.value;
-            final total = stats['total']!;
-            final doorFrameHardware = stats['doorFrameHardware']!;
-            final architrave = stats['architrave']!;
-            final handover = stats['handover']!;
-            final tasks = stats['tasks'] as List;
-
-            return InkWell(
-              onTap: () => _showInstallationDetails(
-                context, 
-                materialGroup, 
-                tasks, 
-                total, 
-                doorFrameHardware, 
-                architrave, 
-                handover
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: flutter.Border(
-                    bottom: BorderSide(color: Colors.grey[200]!),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        materialName,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      size: 20,
+                                      color: Colors.grey[400],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: availableQty <= 0
+                                      ? Colors.red[100]
+                                      : availableQty < requiredQty * 0.2
+                                      ? Colors.orange[100]
+                                      : Colors.green[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 child: Text(
-                                  materialGroup,
+                                  availableQty <= 0
+                                      ? 'Out of Stock'
+                                      : availableQty < requiredQty * 0.2
+                                      ? 'Low Stock'
+                                      : 'In Stock',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
+                                    color: availableQty <= 0
+                                        ? Colors.red[700]
+                                        : availableQty < requiredQty * 0.2
+                                        ? Colors.orange[700]
+                                        : Colors.green[700],
                                   ),
                                 ),
                               ),
-                              Icon(
-                                Icons.chevron_right,
-                                size: 16,
-                                color: Colors.grey[400],
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Usage Progress Bar
+                          Row(
+                            children: [
+                              Text(
+                                'Usage: ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              Expanded(
+                                child: LinearProgressIndicator(
+                                  value: usageRate,
+                                  backgroundColor: Colors.grey[200],
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    usageRate > 0.8
+                                        ? Colors.red
+                                        : usageRate > 0.5
+                                        ? Colors.orange
+                                        : Colors.green,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${(usageRate * 100).toInt()}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: usageRate > 0.8
+                                      ? Colors.red
+                                      : usageRate > 0.5
+                                      ? Colors.orange
+                                      : Colors.green,
+                                ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(
-                            value: total > 0 ? handover / total : 0,
-                            backgroundColor: Colors.grey[200],
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              handover == total
-                                  ? Colors.green
-                                  : Colors.orange,
-                            ),
+
+                          const SizedBox(height: 8),
+
+                          // Fulfillment Progress Bar
+                          Row(
+                            children: [
+                              Text(
+                                'Fulfillment: ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              Expanded(
+                                child: LinearProgressIndicator(
+                                  value: fulfillmentRate > 1.0
+                                      ? 1.0
+                                      : fulfillmentRate,
+                                  backgroundColor: Colors.grey[200],
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    fulfillmentRate >= 1.0
+                                        ? Colors.green
+                                        : fulfillmentRate >= 0.5
+                                        ? Colors.orange
+                                        : Colors.red,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${(fulfillmentRate * 100).toInt()}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: fulfillmentRate >= 1.0
+                                      ? Colors.green
+                                      : fulfillmentRate >= 0.5
+                                      ? Colors.orange
+                                      : Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Stats chips
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              _buildInventoryStatChip(
+                                'Required',
+                                '$requiredQty $uom',
+                                Color(0xFF3B82F6),
+                              ),
+                              _buildInventoryStatChip(
+                                'Received',
+                                '$totalReceivedQty $uom',
+                                Colors.blue,
+                              ),
+                              _buildInventoryStatChip(
+                                'Used',
+                                '$usedQty $uom',
+                                Colors.green,
+                              ),
+                              _buildInventoryStatChip(
+                                'Available',
+                                '$availableQty $uom',
+                                availableQty <= 0 ? Colors.red : Colors.purple,
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 1,
-                      child: Text(
-                        total.toString(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          Text(
-                            '$doorFrameHardware/$total',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: doorFrameHardware == total
-                                  ? Colors.green
-                                  : Colors.orange,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            '${total > 0 ? ((doorFrameHardware / total) * 100).toInt() : 0}%',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          Text(
-                            '$architrave/$total',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: architrave == total
-                                  ? Colors.green
-                                  : Colors.orange,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            '${total > 0 ? ((architrave / total) * 100).toInt() : 0}%',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          Text(
-                            '$handover/$total',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: handover == total
-                                  ? Colors.green
-                                  : Colors.orange,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            '${total > 0 ? ((handover / total) * 100).toInt() : 0}%',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+          const SizedBox(height: 32),
+          // Installation Status by Category
+          const Text(
+            'Installation Status by Category',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('tasks')
+                .snapshots(),
+            builder: (context, tasksSnapshot) {
+              if (!tasksSnapshot.hasData) {
+                return Center(child: CircularProgressIndicator());
+              }
+
+              // Calculate installation status by material group
+              Map<String, Map<String, dynamic>> installationStats = {};
+
+              for (var task in tasksSnapshot.data!.docs) {
+                final data = task.data() as Map<String, dynamic>;
+                final materialGroup = data['materialGroup'] ?? 'Unknown';
+
+                if (!installationStats.containsKey(materialGroup)) {
+                  installationStats[materialGroup] = {
+                    'total': 0,
+                    'doorFrameHardware': 0,
+                    'architrave': 0,
+                    'handover': 0,
+                    'tasks': [], // Store task details for drilling down
+                  };
+                }
+
+                // Add task details to the group
+                installationStats[materialGroup]!['tasks'].add({
+                  'id': task.id,
+                  'data': data,
+                });
+
+                installationStats[materialGroup]!['total'] =
+                    installationStats[materialGroup]!['total']! +
+                    ((data['qty'] ?? 1) as int);
+
+                // Check each installation phase completion based on boolean flags
+                if (data['doorFrameHardware'] == true) {
+                  installationStats[materialGroup]!['doorFrameHardware'] =
+                      installationStats[materialGroup]!['doorFrameHardware']! +
+                      ((data['qty'] ?? 1) as int);
+                }
+                if (data['architrave'] == true) {
+                  installationStats[materialGroup]!['architrave'] =
+                      installationStats[materialGroup]!['architrave']! +
+                      ((data['qty'] ?? 1) as int);
+                }
+                if (data['handover'] == true) {
+                  installationStats[materialGroup]!['handover'] =
+                      installationStats[materialGroup]!['handover']! +
+                      ((data['qty'] ?? 1) as int);
+                }
+              }
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: flutter.Border.all(color: Colors.grey[200]!),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  },
-),
-          
+                child: Column(
+                  children: [
+                    // Table Header
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              'Material Group',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              'Total',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Door+Frame\n+Hardware',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Architrave',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Handover',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Table Rows - Now clickable
+                    ...installationStats.entries.map((entry) {
+                      final materialGroup = entry.key;
+                      final stats = entry.value;
+                      final total = stats['total']!;
+                      final doorFrameHardware = stats['doorFrameHardware']!;
+                      final architrave = stats['architrave']!;
+                      final handover = stats['handover']!;
+                      final tasks = stats['tasks'] as List;
+
+                      return InkWell(
+                        onTap: () => _showInstallationDetails(
+                          context,
+                          materialGroup,
+                          tasks,
+                          total,
+                          doorFrameHardware,
+                          architrave,
+                          handover,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: flutter.Border(
+                              bottom: BorderSide(color: Colors.grey[200]!),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            materialGroup,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          size: 16,
+                                          color: Colors.grey[400],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    LinearProgressIndicator(
+                                      value: total > 0 ? handover / total : 0,
+                                      backgroundColor: Colors.grey[200],
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        handover == total
+                                            ? Colors.green
+                                            : Colors.orange,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                  total.toString(),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      '$doorFrameHardware/$total',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: doorFrameHardware == total
+                                            ? Colors.green
+                                            : Colors.orange,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${total > 0 ? ((doorFrameHardware / total) * 100).toInt() : 0}%',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      '$architrave/$total',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: architrave == total
+                                            ? Colors.green
+                                            : Colors.orange,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${total > 0 ? ((architrave / total) * 100).toInt() : 0}%',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      '$handover/$total',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: handover == total
+                                            ? Colors.green
+                                            : Colors.orange,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${total > 0 ? ((handover / total) * 100).toInt() : 0}%',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              );
+            },
+          ),
+
           const SizedBox(height: 32),
 
           // Recent Activity
@@ -1019,982 +1054,965 @@ StreamBuilder<QuerySnapshot>(
       ),
     );
   }
-// Add this method to your class (outside the build method)
-void _showInventoryDetails(
-  BuildContext context,
-  String materialName,
-  List items,
-  Map<String, dynamic> stats,
-) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.8,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+
+  // Add this method to your class (outside the build method)
+  void _showInventoryDetails(
+    BuildContext context,
+    String materialName,
+    List items,
+    Map<String, dynamic> stats,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          materialName,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Inventory Details',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[100],
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 16),
-
-            // Summary Cards
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildInventorySummaryCard(
-                      'Required',
-                      '${stats['requiredQty']} ${stats['uom']}',
-                      Icons.assignment,
-                      Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildInventorySummaryCard(
-                      'Received',
-                      '${stats['receivedQty']} ${stats['uom']}',
-                      Icons.input,
-                      Colors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildInventorySummaryCard(
-                      'Issued',
-                      '${stats['totalIssuedQty']} ${stats['uom']}',
-                      Icons.output,
-                      Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildInventorySummaryCard(
-                      'Available',
-                      '${stats['balanceQty']} ${stats['uom']}',
-                      Icons.inventory_2,
-                      stats['balanceQty'] <= 0 ? Colors.red : Colors.purple,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Tabbed View
-            Expanded(
-              child: DefaultTabController(
-                length: 3,
-                child: Column(
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
                   children: [
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TabBar(
-                        indicator: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        labelColor: Colors.black,
-                        unselectedLabelColor: Colors.grey[600],
-                        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                        tabs: [
-                          Tab(text: 'Received'),
-                          Tab(text: 'Issued'),
-                          Tab(text: 'Summary'),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            materialName,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Inventory Details',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    Expanded(
-                      child: TabBarView(
-                        children: [
-                          _buildReceivedTab(items, scrollController),
-                          _buildIssuedTab(items, scrollController),
-                          _buildSummaryTab(items, stats, scrollController),
-                        ],
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey[100],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
 
-Widget _buildInventorySummaryCard(String title, String value, IconData icon, Color color) {
-  return Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: flutter.Border.all(color: color.withOpacity(0.3)),
-    ),
-    child: Column(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[700],
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    ),
-  );
-}
+              const SizedBox(height: 16),
 
-Widget _buildReceivedTab(List items, ScrollController scrollController) {
-  List<Map<String, dynamic>> allReceivedEntries = [];
-  
-  for (var item in items) {
-    final data = item['data'] as Map<String, dynamic>;
-    final receivedEntries = data['receivedEntries'] as List? ?? [];
-    final materialName = data['materialName'] ?? 'Unknown';
-    
-    for (var entry in receivedEntries) {
-      allReceivedEntries.add({
-        ...entry,
-        'materialName': materialName,
-        'itemId': item['id'],
-      });
-    }
-  }
-
-  // Sort by date (newest first)
-  allReceivedEntries.sort((a, b) {
-    try {
-      final dateA = DateTime.parse(a['date'].toString().split('.').reversed.join('-'));
-      final dateB = DateTime.parse(b['date'].toString().split('.').reversed.join('-'));
-      return dateB.compareTo(dateA);
-    } catch (e) {
-      return 0;
-    }
-  });
-
-  if (allReceivedEntries.isEmpty) {
-    return _buildEmptyState('No received entries found', Icons.input);
-  }
-
-  return ListView.builder(
-    controller: scrollController,
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    itemCount: allReceivedEntries.length,
-    itemBuilder: (context, index) {
-      final entry = allReceivedEntries[index];
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: flutter.Border.all(color: Colors.green.withOpacity(0.2)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.input,
-                color: Colors.green,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Challan: ${entry['challanNo'] ?? 'N/A'}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+              // Summary Cards
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildInventorySummaryCard(
+                        'Required',
+                        '${stats['requiredQty']} ${stats['uom']}',
+                        Icons.assignment,
+                        Colors.blue,
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${entry['qty'] ?? 0} PCS',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green[700],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Date: ${entry['date'] ?? 'N/A'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildIssuedTab(List items, ScrollController scrollController) {
-  List<Map<String, dynamic>> allIssuedEntries = [];
-  
-  for (var item in items) {
-    final data = item['data'] as Map<String, dynamic>;
-    final issuedEntries = data['issuedEntries'] as List? ?? [];
-    final materialName = data['materialName'] ?? 'Unknown';
-    
-    for (var entry in issuedEntries) {
-      allIssuedEntries.add({
-        ...entry,
-        'materialName': materialName,
-        'itemId': item['id'],
-      });
-    }
-  }
-
-  // Sort by date (newest first)
-  allIssuedEntries.sort((a, b) {
-    try {
-      final dateA = DateTime.parse(a['date'].toString().split('.').reversed.join('-'));
-      final dateB = DateTime.parse(b['date'].toString().split('.').reversed.join('-'));
-      return dateB.compareTo(dateA);
-    } catch (e) {
-      return 0;
-    }
-  });
-
-  if (allIssuedEntries.isEmpty) {
-    return _buildEmptyState('No issued entries found', Icons.output);
-  }
-
-  return ListView.builder(
-    controller: scrollController,
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    itemCount: allIssuedEntries.length,
-    itemBuilder: (context, index) {
-      final entry = allIssuedEntries[index];
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: flutter.Border.all(color: Colors.orange.withOpacity(0.2)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.output,
-                color: Colors.orange,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Challan: ${entry['challanNo'] ?? 'N/A'}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildInventorySummaryCard(
+                        'Received',
+                        '${stats['totalReceivedQty']} ${stats['uom']}',
+                        Icons.input,
+                        Colors.green,
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${entry['qty'] ?? 0} PCS',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.orange[700],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildInventorySummaryCard(
+                        'Issued',
+                        '${stats['totalIssuedQty']} ${stats['uom']}',
+                        Icons.output,
+                        Colors.orange,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Contractor: ${entry['contractorName'] ?? 'N/A'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
                     ),
-                  ),
-                  Text(
-                    'Date: ${entry['date'] ?? 'N/A'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildInventorySummaryCard(
+                        'Available',
+                        '${stats['balanceQty']} ${stats['uom']}',
+                        Icons.inventory_2,
+                        stats['balanceQty'] <= 0 ? Colors.red : Colors.purple,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildSummaryTab(List items, Map<String, dynamic> stats, ScrollController scrollController) {
-  return SingleChildScrollView(
-    controller: scrollController,
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Overview Card
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue[600]!, Colors.blue[800]!],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Inventory Overview',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildOverviewStat(
-                      'Total Required',
-                      '${stats['requiredQty']} ${stats['uom']}',
-                      Icons.assignment,
-                    ),
+
+              const SizedBox(height: 20),
+
+              // Tabbed View
+              Expanded(
+                child: DefaultTabController(
+                  length: 3,
+                  child: Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: TabBar(
+                          indicator: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          labelColor: Colors.black,
+                          unselectedLabelColor: Colors.grey[600],
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          tabs: [
+                            Tab(text: 'Received'),
+                            Tab(text: 'Issued'),
+                            Tab(text: 'Summary'),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _buildReceivedTab(items, scrollController),
+                            _buildIssuedTab(items, scrollController),
+                            _buildSummaryTab(items, stats, scrollController),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildOverviewStat(
-                      'Total Received',
-                      '${stats['totalReceivedQty']} ${stats['uom']}',
-                      Icons.input,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildOverviewStat(
-                      'Total Issued',
-                      '${stats['totalIssuedQty']} ${stats['uom']}',
-                      Icons.output,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildOverviewStat(
-                      'Balance Available',
-                      '${stats['balanceQty']} ${stats['uom']}',
-                      Icons.inventory_2,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
         ),
-
-        const SizedBox(height: 20),
-
-        // Progress Indicators
-        _buildProgressSection('Fulfillment Rate', 
-          stats['requiredQty'] > 0 ? (stats['totalReceivedQty'] / stats['requiredQty']) : 0,
-          Colors.green),
-        
-        const SizedBox(height: 16),
-        
-        _buildProgressSection('Usage Rate',
-          stats['totalReceivedQty'] > 0 ? (stats['totalIssuedQty'] / stats['totalReceivedQty']) : 0,
-          Colors.orange),
-
-        const SizedBox(height: 20),
-
-        // Item Details
-        Text(
-          'Item Breakdown',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        ...items.map((item) {
-          final data = item['data'] as Map<String, dynamic>;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-              border: flutter.Border.all(color: Colors.grey[200]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Item ID: ${item['id']}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      'Updated: ${data['updatedAt'] != null ? _formatTimestamp(data['updatedAt']) : 'N/A'}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    _buildMiniStatChip('Required', '${data['requiredQty']} ${data['uom']}', Colors.blue),
-                    _buildMiniStatChip('Received', '${data['receivedQty']} ${data['uom']}', Colors.green),
-                    _buildMiniStatChip('Issued', '${data['totalIssuedQty']} ${data['uom']}', Colors.orange),
-                    _buildMiniStatChip('Balance', '${data['balanceQty']} ${data['uom']}', Colors.purple),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ],
-    ),
-  );
-}
-
-Widget _buildOverviewStat(String title, String value, IconData icon) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icon, color: Colors.white.withOpacity(0.8), size: 20),
-      const SizedBox(height: 4),
-      Text(
-        value,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
       ),
-      Text(
-        title,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.8),
-          fontSize: 12,
-        ),
-      ),
-    ],
-  );
-}
+    );
+  }
 
-Widget _buildProgressSection(String title, double progress, Color color) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildInventorySummaryCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: flutter.Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
         children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
           Text(
-            title,
+            value,
             style: TextStyle(
-              fontWeight: FontWeight.w500,
               fontSize: 14,
-            ),
-          ),
-          Text(
-            '${(progress * 100).toInt()}%',
-            style: TextStyle(
               fontWeight: FontWeight.bold,
               color: color,
             ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: TextStyle(fontSize: 10, color: Colors.grey[700]),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
-      const SizedBox(height: 8),
-      LinearProgressIndicator(
-        value: progress > 1.0 ? 1.0 : progress,
-        backgroundColor: Colors.grey[200],
-        valueColor: AlwaysStoppedAnimation<Color>(color),
-      ),
-    ],
-  );
-}
-
-Widget _buildMiniStatChip(String label, String value, Color color) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: flutter.Border.all(color: color.withOpacity(0.3)),
-    ),
-    child: Text(
-      '$label: $value',
-      style: TextStyle(
-        fontSize: 10,
-        color: color,
-        fontWeight: FontWeight.w500,
-      ),
-    ),
-  );
-}
-
-Widget _buildEmptyState(String message, IconData icon) {
-  return Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          size: 48,
-          color: Colors.grey[400],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          message,
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// Helper method to format timestamp
-String _formatTimestamp(dynamic timestamp) {
-  if (timestamp == null) return 'N/A';
-  
-  try {
-    DateTime date;
-    if (timestamp is Timestamp) {
-      date = timestamp.toDate();
-    } else if (timestamp is String) {
-      date = DateTime.parse(timestamp);
-    } else {
-      return 'Invalid date';
-    }
-    
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  } catch (e) {
-    return 'Invalid date';
+    );
   }
-}
-void _showInstallationDetails(
-  BuildContext context,
-  String materialGroup,
-  List tasks,
-  int total,
-  int doorFrameHardware,
-  int architrave,
-  int handover,
-) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.9,
-      builder: (context, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+
+  Widget _buildReceivedTab(List items, ScrollController scrollController) {
+    List<Map<String, dynamic>> allReceivedEntries = [];
+
+    for (var item in items) {
+      final data = item['data'] as Map<String, dynamic>;
+      final receivedEntries = data['receivedEntries'] as List? ?? [];
+      final materialName = data['materialName'] ?? 'Unknown';
+
+      for (var entry in receivedEntries) {
+        allReceivedEntries.add({
+          ...entry,
+          'materialName': materialName,
+          'itemId': item['id'],
+        });
+      }
+    }
+
+    // Sort by date (newest first)
+    allReceivedEntries.sort((a, b) {
+      try {
+        final dateA = DateTime.parse(
+          a['date'].toString().split('.').reversed.join('-'),
+        );
+        final dateB = DateTime.parse(
+          b['date'].toString().split('.').reversed.join('-'),
+        );
+        return dateB.compareTo(dateA);
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    if (allReceivedEntries.isEmpty) {
+      return _buildEmptyState('No received entries found', Icons.input);
+    }
+
+    return ListView.builder(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: allReceivedEntries.length,
+      itemBuilder: (context, index) {
+        final entry = allReceivedEntries[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: flutter.Border.all(color: Colors.green.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 4,
+                offset: Offset(0, 2),
               ),
-            ),
-            
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.input, color: Colors.green, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          materialGroup,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            'Challan: ${entry['challanNo'] ?? 'N/A'}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$handover of $total completed',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${entry['qty'] ?? 0} PCS',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[100],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Date: ${entry['date'] ?? 'N/A'}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-            const SizedBox(height: 16),
+  Widget _buildIssuedTab(List items, ScrollController scrollController) {
+    List<Map<String, dynamic>> allIssuedEntries = [];
 
-            // Progress Summary Cards
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildProgressSummaryCard(
-                      'Door+Frame+Hardware',
-                      doorFrameHardware,
-                      total,
-                      Icons.door_front_door,
-                      Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildProgressSummaryCard(
-                      'Architrave',
-                      architrave,
-                      total,
-                      Icons.design_services,
-                      Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildProgressSummaryCard(
-                      'Handover',
-                      handover,
-                      total,
-                      Icons.check_circle,
-                      Colors.green,
-                    ),
-                  ),
-                ],
+    for (var item in items) {
+      final data = item['data'] as Map<String, dynamic>;
+      final issuedEntries = data['issuedEntries'] as List? ?? [];
+      final materialName = data['materialName'] ?? 'Unknown';
+
+      for (var entry in issuedEntries) {
+        allIssuedEntries.add({
+          ...entry,
+          'materialName': materialName,
+          'itemId': item['id'],
+        });
+      }
+    }
+
+    // Sort by date (newest first)
+    allIssuedEntries.sort((a, b) {
+      try {
+        final dateA = DateTime.parse(
+          a['date'].toString().split('.').reversed.join('-'),
+        );
+        final dateB = DateTime.parse(
+          b['date'].toString().split('.').reversed.join('-'),
+        );
+        return dateB.compareTo(dateA);
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    if (allIssuedEntries.isEmpty) {
+      return _buildEmptyState('No issued entries found', Icons.output);
+    }
+
+    return ListView.builder(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: allIssuedEntries.length,
+      itemBuilder: (context, index) {
+        final entry = allIssuedEntries[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: flutter.Border.all(color: Colors.orange.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 4,
+                offset: Offset(0, 2),
               ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Task List
-            Expanded(
-              child: DefaultTabController(
-                length: 4,
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.output, color: Colors.orange, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TabBar(
-                        indicator: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Challan: ${entry['challanNo'] ?? 'N/A'}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                        labelColor: Colors.black,
-                        unselectedLabelColor: Colors.grey[600],
-                        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                        tabs: [
-                          Tab(text: 'All'),
-                          Tab(text: 'Pending'),
-                          Tab(text: 'In Progress'),
-                          Tab(text: 'Completed'),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${entry['qty'] ?? 0} PCS',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Contractor: ${entry['contractorName'] ?? 'N/A'}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    Text(
+                      'Date: ${entry['date'] ?? 'N/A'}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryTab(
+    List items,
+    Map<String, dynamic> stats,
+    ScrollController scrollController,
+  ) {
+    return SingleChildScrollView(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Overview Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue[600]!, Colors.blue[800]!],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Inventory Overview',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildOverviewStat(
+                        'Total Required',
+                        '${stats['requiredQty']} ${stats['uom']}',
+                        Icons.assignment,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildOverviewStat(
+                        'Total Received',
+                        '${stats['totalReceivedQty']} ${stats['uom']}',
+                        Icons.input,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildOverviewStat(
+                        'Total Issued',
+                        '${stats['totalIssuedQty']} ${stats['uom']}',
+                        Icons.output,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildOverviewStat(
+                        'Balance Available',
+                        '${stats['balanceQty']} ${stats['uom']}',
+                        Icons.inventory_2,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Progress Indicators
+          _buildProgressSection(
+            'Fulfillment Rate',
+            stats['requiredQty'] > 0
+                ? (stats['totalReceivedQty'] / stats['requiredQty'])
+                : 0,
+            Colors.green,
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildProgressSection(
+            'Usage Rate',
+            stats['totalReceivedQty'] > 0
+                ? (stats['totalIssuedQty'] / stats['totalReceivedQty'])
+                : 0,
+            Colors.orange,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Item Details
+          Text(
+            'Item Breakdown',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+
+          ...items.map((item) {
+            final data = item['data'] as Map<String, dynamic>;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: flutter.Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Item ID: ${item['id']}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Updated: ${data['updatedAt'] != null ? _formatTimestamp(data['updatedAt']) : 'N/A'}',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      _buildMiniStatChip(
+                        'Required',
+                        '${data['requiredQty']} ${data['uom']}',
+                        Colors.blue,
+                      ),
+                      _buildMiniStatChip(
+                        'Received',
+                        '${data['receivedQty']} ${data['uom']}',
+                        Colors.green,
+                      ),
+                      _buildMiniStatChip(
+                        'Issued',
+                        '${data['totalIssuedQty']} ${data['uom']}',
+                        Colors.orange,
+                      ),
+                      _buildMiniStatChip(
+                        'Balance',
+                        '${data['balanceQty']} ${data['uom']}',
+                        Colors.purple,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewStat(String title, String value, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: Colors.white.withOpacity(0.8), size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          title,
+          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressSection(String title, double progress, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+            ),
+            Text(
+              '${(progress * 100).toInt()}%',
+              style: TextStyle(fontWeight: FontWeight.bold, color: color),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: progress > 1.0 ? 1.0 : progress,
+          backgroundColor: Colors.grey[200],
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStatChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: flutter.Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String message, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method to format timestamp
+  String _formatTimestamp(dynamic timestamp) {
+    if (timestamp == null) return 'N/A';
+
+    try {
+      DateTime date;
+      if (timestamp is Timestamp) {
+        date = timestamp.toDate();
+      } else if (timestamp is String) {
+        date = DateTime.parse(timestamp);
+      } else {
+        return 'Invalid date';
+      }
+
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 1) {
+        return 'Just now';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m ago';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}h ago';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}d ago';
+      } else {
+        return '${date.day}/${date.month}/${date.year}';
+      }
+    } catch (e) {
+      return 'Invalid date';
+    }
+  }
+
+  void _showInstallationDetails(
+    BuildContext context,
+    String materialGroup,
+    List tasks,
+    int total,
+    int doorFrameHardware,
+    int architrave,
+    int handover,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            materialGroup,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$handover of $total completed',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    Expanded(
-                      child: TabBarView(
-                        children: [
-                          _buildTaskList(tasks, 'all', scrollController),
-                          _buildTaskList(tasks, 'pending', scrollController),
-                          _buildTaskList(tasks, 'in_progress', scrollController),
-                          _buildTaskList(tasks, 'completed', scrollController),
-                        ],
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey[100],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 16),
+
+              // Progress Summary Cards
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildProgressSummaryCard(
+                        'Door+Frame+Hardware',
+                        doorFrameHardware,
+                        total,
+                        Icons.door_front_door,
+                        Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildProgressSummaryCard(
+                        'Architrave',
+                        architrave,
+                        total,
+                        Icons.design_services,
+                        Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildProgressSummaryCard(
+                        'Handover',
+                        handover,
+                        total,
+                        Icons.check_circle,
+                        Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Task List
+              Expanded(
+                child: DefaultTabController(
+                  length: 4,
+                  child: Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: TabBar(
+                          indicator: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          labelColor: Colors.black,
+                          unselectedLabelColor: Colors.grey[600],
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          tabs: [
+                            Tab(text: 'All'),
+                            Tab(text: 'Pending'),
+                            Tab(text: 'In Progress'),
+                            Tab(text: 'Completed'),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _buildTaskList(tasks, 'all', scrollController),
+                            _buildTaskList(tasks, 'pending', scrollController),
+                            _buildTaskList(
+                              tasks,
+                              'in_progress',
+                              scrollController,
+                            ),
+                            _buildTaskList(
+                              tasks,
+                              'completed',
+                              scrollController,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget _buildProgressSummaryCard(String title, int completed, int total, IconData icon, Color color) {
-  final percentage = total > 0 ? (completed / total * 100).round() : 0;
-  
-  return Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: flutter.Border.all(color: color.withOpacity(0.3)),
-    ),
-    child: Column(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 8),
-        Text(
-          '$completed/$total',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[700],
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '$percentage%',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: color,
-          ),
-        ),
-      ],
-    ),
-  );
-}
+  Widget _buildProgressSummaryCard(
+    String title,
+    int completed,
+    int total,
+    IconData icon,
+    Color color,
+  ) {
+    final percentage = total > 0 ? (completed / total * 100).round() : 0;
 
-Widget _buildTaskList(List tasks, String filter, ScrollController scrollController) {
-  List filteredTasks = tasks.where((task) {
-    final data = task['data'] as Map<String, dynamic>;
-    final handover = data['handover'] ?? false;
-    final doorFrameHardware = data['doorFrameHardware'] ?? false;
-    
-    switch (filter) {
-      case 'pending':
-        return !doorFrameHardware;
-      case 'in_progress':
-        return doorFrameHardware && !handover;
-      case 'completed':
-        return handover;
-      default:
-        return true;
-    }
-  }).toList();
-
-  if (filteredTasks.isEmpty) {
-    return Center(
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: flutter.Border.all(color: color.withOpacity(0.3)),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.assignment_turned_in,
-            size: 48,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 8),
           Text(
-            'No ${filter == 'all' ? '' : filter} tasks found',
+            '$completed/$total',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(fontSize: 10, color: Colors.grey[700]),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$percentage%',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: color,
             ),
           ),
         ],
@@ -2002,168 +2020,205 @@ Widget _buildTaskList(List tasks, String filter, ScrollController scrollControll
     );
   }
 
-  return ListView.builder(
-    controller: scrollController,
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    itemCount: filteredTasks.length,
-    itemBuilder: (context, index) {
-      final task = filteredTasks[index];
+  Widget _buildTaskList(
+    List tasks,
+    String filter,
+    ScrollController scrollController,
+  ) {
+    List filteredTasks = tasks.where((task) {
       final data = task['data'] as Map<String, dynamic>;
       final handover = data['handover'] ?? false;
       final doorFrameHardware = data['doorFrameHardware'] ?? false;
-      final architrave = data['architrave'] ?? false;
-      
-      String status;
-      Color statusColor;
-      IconData statusIcon;
-      
-      if (handover) {
-        status = 'Completed';
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
-      } else if (doorFrameHardware) {
-        status = 'In Progress';
-        statusColor = Colors.orange;
-        statusIcon = Icons.schedule;
-      } else {
-        status = 'Pending';
-        statusColor = Colors.red;
-        statusIcon = Icons.pending;
-      }
 
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: flutter.Border.all(color: Colors.grey[200]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
+      switch (filter) {
+        case 'pending':
+          return !doorFrameHardware;
+        case 'in_progress':
+          return doorFrameHardware && !handover;
+        case 'completed':
+          return handover;
+        default:
+          return true;
+      }
+    }).toList();
+
+    if (filteredTasks.isEmpty) {
+      return Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data['flatNo'].toString(),
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        data['location'] ?? 'No location specified',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 14, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        status,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: statusColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            Icon(Icons.assignment_turned_in, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No ${filter == 'all' ? '' : filter} tasks found',
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             ),
-            
-            const SizedBox(height: 12),
-            
-            // Progress indicators
-            Row(
-              children: [
-                _buildMiniProgressIndicator(
-                  'Door+Frame+Hardware',
-                  doorFrameHardware,
-                  Colors.blue,
-                ),
-                const SizedBox(width: 12),
-                _buildMiniProgressIndicator(
-                  'Architrave',
-                  architrave,
-                  Colors.orange,
-                ),
-                const SizedBox(width: 12),
-                _buildMiniProgressIndicator(
-                  'Handover',
-                  handover,
-                  Colors.green,
-                ),
-              ],
-            ),
-            
-            if (data['qty'] != null && data['qty'] > 1) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Quantity: ${data['qty']}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
           ],
         ),
       );
-    },
-  );
-}
+    }
 
-Widget _buildMiniProgressIndicator(String label, bool isCompleted, Color color) {
-  return Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 2),
-        Container(
-          height: 4,
+    return ListView.builder(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: filteredTasks.length,
+      itemBuilder: (context, index) {
+        final task = filteredTasks[index];
+        final data = task['data'] as Map<String, dynamic>;
+        final handover = data['handover'] ?? false;
+        final doorFrameHardware = data['doorFrameHardware'] ?? false;
+        final architrave = data['architrave'] ?? false;
+
+        String status;
+        Color statusColor;
+        IconData statusIcon;
+
+        if (handover) {
+          status = 'Completed';
+          statusColor = Colors.green;
+          statusIcon = Icons.check_circle;
+        } else if (doorFrameHardware) {
+          status = 'In Progress';
+          statusColor = Colors.orange;
+          statusIcon = Icons.schedule;
+        } else {
+          status = 'Pending';
+          statusColor = Colors.red;
+          statusIcon = Icons.pending;
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isCompleted ? color : Colors.grey[200],
-            borderRadius: BorderRadius.circular(2),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: flutter.Border.all(color: Colors.grey[200]!),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
-        ),
-      ],
-    ),
-  );
-}
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data['flatNo'].toString(),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          data['location'] ?? 'No location specified',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(statusIcon, size: 14, color: statusColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          status,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: statusColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Progress indicators
+              Row(
+                children: [
+                  _buildMiniProgressIndicator(
+                    'Door+Frame+Hardware',
+                    doorFrameHardware,
+                    Colors.blue,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildMiniProgressIndicator(
+                    'Architrave',
+                    architrave,
+                    Colors.orange,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildMiniProgressIndicator(
+                    'Handover',
+                    handover,
+                    Colors.green,
+                  ),
+                ],
+              ),
+
+              if (data['qty'] != null && data['qty'] > 1) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Quantity: ${data['qty']}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMiniProgressIndicator(
+    String label,
+    bool isCompleted,
+    Color color,
+  ) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+          const SizedBox(height: 2),
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: isCompleted ? color : Colors.grey[200],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Helper method for inventory stat chips
   Widget _buildInventoryStatChip(String label, String value, Color color) {
     return Container(
@@ -2361,7 +2416,8 @@ Widget _buildMiniProgressIndicator(String label, bool isCompleted, Color color) 
         );
       },
     );
-  } 
+  }
+
   Widget _buildFeedItem(
     String title,
     String description,
@@ -2483,17 +2539,17 @@ Widget _buildMiniProgressIndicator(String label, bool isCompleted, Color color) 
           final category = _categorizeItem(materialName);
 
           // Overall stats - handle both int and double from Firestore
-          totalUsed += ((data['totalIssuedQty'] ?? 0) is int 
-              ? (data['totalIssuedQty'] ?? 0) as int 
+          totalUsed += ((data['totalIssuedQty'] ?? 0) is int
+              ? (data['totalIssuedQty'] ?? 0) as int
               : ((data['totalIssuedQty'] ?? 0) as double).toInt());
-          totalReceived += ((data['totalReceivedQty'] ?? 0) is int 
-              ? (data['totalReceivedQty'] ?? 0) as int 
+          totalReceived += ((data['totalReceivedQty'] ?? 0) is int
+              ? (data['totalReceivedQty'] ?? 0) as int
               : ((data['totalReceivedQty'] ?? 0) as double).toInt());
-          totalBalance += ((data['balIssueQty'] ?? 0) is int 
-              ? (data['balIssueQty'] ?? 0) as int 
+          totalBalance += ((data['balIssueQty'] ?? 0) is int
+              ? (data['balIssueQty'] ?? 0) as int
               : ((data['balIssueQty'] ?? 0) as double).toInt());
-          totalRequired += ((data['requiredQty'] ?? 0) is int 
-              ? (data['requiredQty'] ?? 0) as int 
+          totalRequired += ((data['requiredQty'] ?? 0) is int
+              ? (data['requiredQty'] ?? 0) as int
               : ((data['requiredQty'] ?? 0) as double).toInt());
 
           // Category stats
@@ -2511,23 +2567,23 @@ Widget _buildMiniProgressIndicator(String label, bool isCompleted, Color color) 
               categoryStats[category]!['items']! + 1;
           categoryStats[category]!['required'] =
               categoryStats[category]!['required']! +
-              ((data['requiredQty'] ?? 0) is int 
-                  ? (data['requiredQty'] ?? 0) as int 
+              ((data['requiredQty'] ?? 0) is int
+                  ? (data['requiredQty'] ?? 0) as int
                   : ((data['requiredQty'] ?? 0) as double).toInt());
           categoryStats[category]!['received'] =
               categoryStats[category]!['received']! +
-              ((data['totalReceivedQty'] ?? 0) is int 
-                  ? (data['totalReceivedQty'] ?? 0) as int 
+              ((data['totalReceivedQty'] ?? 0) is int
+                  ? (data['totalReceivedQty'] ?? 0) as int
                   : ((data['totalReceivedQty'] ?? 0) as double).toInt());
           categoryStats[category]!['issued'] =
               categoryStats[category]!['issued']! +
-              ((data['totalIssuedQty'] ?? 0) is int 
-                  ? (data['totalIssuedQty'] ?? 0) as int 
+              ((data['totalIssuedQty'] ?? 0) is int
+                  ? (data['totalIssuedQty'] ?? 0) as int
                   : ((data['totalIssuedQty'] ?? 0) as double).toInt());
           categoryStats[category]!['balance'] =
               categoryStats[category]!['balance']! +
-              ((data['balIssueQty'] ?? 0) is int 
-                  ? (data['balIssueQty'] ?? 0) as int 
+              ((data['balIssueQty'] ?? 0) is int
+                  ? (data['balIssueQty'] ?? 0) as int
                   : ((data['balIssueQty'] ?? 0) as double).toInt());
         }
 
@@ -3176,126 +3232,175 @@ Widget _buildMiniProgressIndicator(String label, bool isCompleted, Color color) 
                   ),
                 );
               }
+              if (snapshot.hasData) {
+                List<DocumentSnapshot> docs = snapshot.data!.docs;
 
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: snapshot.data!.docs.length,
-                itemBuilder: (context, index) {
-                  final item = snapshot.data!.docs[index];
-                  final data = item.data() as Map<String, dynamic>;
+                // Sort using custom order safely
+                docs.sort((a, b) {
+                  final dataA = a.data() as Map<String, dynamic>? ?? {};
+                  final dataB = b.data() as Map<String, dynamic>? ?? {};
 
-                  return _buildInventoryCard(
-                    data['materialName'] ?? 'Unknown Item',
-                    data['requiredQty'] ?? 0,
-                    data['totalReceivedQty'] ?? 0,
-                    data['totalIssuedQty'] ?? 0,
-                    data['uom'] ?? 'PCS',
-                    data['receivedEntries'] ?? [],
-                    data['issuedEntries'] ?? [],
-                    List<Map<String, dynamic>>.from(data['editHistory'] ?? []), // Edit history
-                    (materialName) => _handleEditItem(materialName, item.id), // Edit callback
-                    (materialName) => _handleDeleteItem(materialName, item.id), // Delete callback
-                  );
-                },
-              );
+                  final nameA = (dataA['materialName'] ?? "").toString().trim();
+                  final nameB = (dataB['materialName'] ?? "").toString().trim();
+
+                  int indexA = materialOrder.indexOf(nameA);
+                  int indexB = materialOrder.indexOf(nameB);
+
+                  if (indexA == -1) indexA = 999;
+                  if (indexB == -1) indexB = 999;
+
+                  return indexA.compareTo(indexB);
+                });
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final item = docs[index]; // ✅ USE SORTED LIST
+                    final data = item.data() as Map<String, dynamic>? ?? {};
+
+                    // Calculate totals from entries (matching edit_inventory.dart logic)
+                    final receivedEntries =
+                        (data['receivedEntries'] ?? []) as List;
+                    final totalReceivedQty = receivedEntries.fold<int>(0, (
+                      acc,
+                      entry,
+                    ) {
+                      return acc + ((entry['qty'] as int?) ?? 0);
+                    });
+
+                    final issuedEntries = (data['issuedEntries'] ?? []) as List;
+                    final totalIssuedQty = issuedEntries.fold<int>(0, (
+                      acc,
+                      entry,
+                    ) {
+                      return acc + ((entry['qty'] as int?) ?? 0);
+                    });
+
+                    return _buildInventoryCard(
+                      data['materialName'] ?? 'Unknown Item',
+                      data['requiredQty'] ?? 0,
+                      totalReceivedQty,
+                      totalIssuedQty,
+                      data['uom'] ?? 'PCS',
+                      receivedEntries,
+                      issuedEntries,
+                      List<Map<String, dynamic>>.from(
+                        data['editHistory'] ?? [],
+                      ),
+                      (materialName) => _handleEditItem(materialName, item.id),
+                      (materialName) =>
+                          _handleDeleteItem(materialName, item.id),
+                    );
+                  },
+                );
+              } else {
+                return Container();
+              }
             },
           ),
         ),
       ],
     );
   }
-void _handleEditItem(String materialName, String itemId) async{
-  if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.editInventoryProject)) 
-  {
-  _showEditDialog(materialName, itemId);
-  }
-  else{
-    await ErrorDialog.show(
-      context,
-      title: 'Permission Denied', 
-      message: 'You do not have permission to edit inventory items.');
-  }
-}
-void _handleDeleteItem(String materialName, String itemId) async {
-  if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.deleteInventoryProject)) 
-  {
-  // Show confirmation dialog and delete item
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: const Text('Delete Item'),
-        content: Text('Are you sure you want to delete "$materialName"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              _deleteInventoryItem(itemId);
-              Navigator.of(context).pop();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
+
+  void _handleEditItem(String materialName, String itemId) async {
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.editInventoryProject,
+    )) {
+      _showEditDialog(materialName, itemId);
+    } else {
+      await ErrorDialog.show(
+        context,
+        title: 'Permission Denied',
+        message: 'You do not have permission to edit inventory items.',
       );
-    },
-  );
+    }
   }
-  else{
-    await ErrorDialog.show(
+
+  void _handleDeleteItem(String materialName, String itemId) async {
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.deleteInventoryProject,
+    )) {
+      // Show confirmation dialog and delete item
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Delete Item'),
+            content: Text('Are you sure you want to delete "$materialName"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  _deleteInventoryItem(itemId);
+                  Navigator.of(context).pop();
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      await ErrorDialog.show(
+        context,
+        title: 'Permission Denied',
+        message: 'You do not have permission to delete inventory items.',
+      );
+    }
+  }
+
+  // Method to delete inventory item from Firestore
+  void _deleteInventoryItem(String itemId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('inventory')
+          .doc(itemId)
+          .delete();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Item deleted successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting item: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Method to show edit dialog (you'll need to implement this based on your requirements)
+  void _showEditDialog(String materialName, String itemId) {
+    // Implement your edit dialog/page here
+    // This could navigate to an edit page or show a dialog with edit form
+    print('Edit item: $materialName with ID: $itemId');
+
+    // Example: Navigate to edit page
+    Navigator.push(
       context,
-      title: 'Permission Denied', 
-      message: 'You do not have permission to delete inventory items.');
-  }
-}
-
-// Method to delete inventory item from Firestore
-void _deleteInventoryItem(String itemId) async {
-  try {
-    await FirebaseFirestore.instance
-        .collection('projects')
-        .doc(widget.projectId)
-        .collection('inventory')
-        .doc(itemId)
-        .delete();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Item deleted successfully'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error deleting item: $e'),
-        backgroundColor: Colors.red,
+      MaterialPageRoute(
+        builder: (context) => EditInventoryPage(
+          projectId: widget.projectId,
+          itemId: itemId,
+          materialName: materialName,
+        ),
       ),
     );
   }
-}
-
-// Method to show edit dialog (you'll need to implement this based on your requirements)
-void _showEditDialog(String materialName, String itemId) {
-  // Implement your edit dialog/page here
-  // This could navigate to an edit page or show a dialog with edit form
-  print('Edit item: $materialName with ID: $itemId');
-  
-  // Example: Navigate to edit page
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => EditInventoryPage(
-        projectId: widget.projectId,
-        itemId: itemId,
-        materialName: materialName,
-      ),
-    ),
-  );
-}
 
   Future<void> _addInventoryItem() async {
     final nameController = TextEditingController();
@@ -3303,124 +3408,128 @@ void _showEditDialog(String materialName, String itemId) {
     final receivedQtyController = TextEditingController();
     final usedQtyController = TextEditingController();
     final uomController = TextEditingController();
-    if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.addInventoryProject)) 
-        {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Inventory Item'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Material Name',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: requiredQtyController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Required Quantity',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: receivedQtyController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Received Quantity',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: usedQtyController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Used Quantity',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: uomController,
-                decoration: const InputDecoration(
-                  labelText: 'Unit of Measurement',
-                  border: OutlineInputBorder(),
-                  hintText: 'e.g., PCS, KG, M',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                await FirebaseFirestore.instance
-                    .collection('projects')
-                    .doc(widget.projectId)
-                    .collection('inventory')
-                    .add({
-                      'materialName': nameController.text,
-                      'requiredQty':
-                          int.tryParse(requiredQtyController.text) ?? 0,
-                      'receivedQty':
-                          int.tryParse(receivedQtyController.text) ?? 0,
-                      'usedQty': int.tryParse(usedQtyController.text) ?? 0,
-                      'uom': uomController.text.isNotEmpty
-                          ? uomController.text
-                          : 'PCS',
-                      'addedAt': Timestamp.now(),
-                    });
-
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Inventory item added successfully!'),
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.addInventoryProject,
+    )) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Add Inventory Item'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Material Name',
+                    border: OutlineInputBorder(),
                   ),
-                );
-              }
-            },
-            child: const Text('Add'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: requiredQtyController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Required Quantity',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: receivedQtyController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Received Quantity',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: usedQtyController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Used Quantity',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: uomController,
+                  decoration: const InputDecoration(
+                    labelText: 'Unit of Measurement',
+                    border: OutlineInputBorder(),
+                    hintText: 'e.g., PCS, KG, M',
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-    );}
-    else{
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.isNotEmpty) {
+                  await FirebaseFirestore.instance
+                      .collection('projects')
+                      .doc(widget.projectId)
+                      .collection('inventory')
+                      .add({
+                        'materialName': nameController.text,
+                        'requiredQty':
+                            int.tryParse(requiredQtyController.text) ?? 0,
+                        'receivedQty':
+                            int.tryParse(receivedQtyController.text) ?? 0,
+                        'usedQty': int.tryParse(usedQtyController.text) ?? 0,
+                        'uom': uomController.text.isNotEmpty
+                            ? uomController.text
+                            : 'PCS',
+                        'addedAt': Timestamp.now(),
+                      });
+
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Inventory item added successfully!'),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      );
+    } else {
       await ErrorDialog.show(
         context,
-        title: 'Permission Denied', 
-        message: 'You do not have permission to add inventory items.');
+        title: 'Permission Denied',
+        message: 'You do not have permission to add inventory items.',
+      );
     }
   }
+
   Widget _buildStatChip(String label, int value, Color color) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(
-      '$label: $value',
-      style: TextStyle(
-        color: color,
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
       ),
-    ),
-  );
-}
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
 
   // Modified Excel upload to only import material name and required qty
   Future<void> _processInventoryExcel(Sheet table) async {
@@ -3554,301 +3663,320 @@ void _showEditDialog(String materialName, String itemId) {
     );
   }
 
- Widget _buildInventoryCard(
-  String materialName,
-  int requiredQty,
-  int totalReceivedQty,
-  int totalIssueQty,
-  String uom,
-  List receivedEntries,
-  List issuedEntries,
-  List<Map<String, dynamic>>? editHistory, // New parameter for edit history
-  Function(String)? onEdit,
-  Function(String)? onDelete,
-) {
-  final balanceQty = requiredQty - totalReceivedQty;
-  final balIssueQty = totalReceivedQty - totalIssueQty;
+  Widget _buildInventoryCard(
+    String materialName,
+    int requiredQty,
+    int totalReceivedQty,
+    int totalIssueQty,
+    String uom,
+    List receivedEntries,
+    List issuedEntries,
+    List<Map<String, dynamic>>? editHistory, // New parameter for edit history
+    Function(String)? onEdit,
+    Function(String)? onDelete,
+  ) {
+    final balanceQty = requiredQty - totalReceivedQty;
+    final balIssueQty = totalReceivedQty - totalIssueQty;
 
-  final Color balanceColor = balanceQty <= 0 ? Colors.green : Colors.red;
-  final Color issueBalanceColor = balIssueQty > 0 ? Colors.green : Colors.red;
+    final Color balanceColor = balanceQty <= 0 ? Colors.green : Colors.red;
+    final Color issueBalanceColor = balIssueQty > 0 ? Colors.green : Colors.red;
 
-  return GestureDetector(
-    onTap: () {
-      // Navigate to details page
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => InventoryDetailsPage(
-            materialName: materialName,
-            requiredQty: requiredQty,
-            totalReceivedQty: totalReceivedQty,
-            totalIssueQty: totalIssueQty,
-            uom: uom,
-            receivedEntries: receivedEntries,
-            issuedEntries: issuedEntries,
-            editHistory: editHistory ?? [],
+    return GestureDetector(
+      onTap: () {
+        // Navigate to details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => InventoryDetailsPage(
+              materialName: materialName,
+              requiredQty: requiredQty,
+              totalReceivedQty: totalReceivedQty,
+              totalIssuedQty: totalIssueQty,
+              uom: uom,
+              receivedEntries: receivedEntries,
+              issuedEntries: issuedEntries,
+              editHistory: editHistory ?? [],
+            ),
           ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: flutter.Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-      );
-    },
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: flutter.Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    materialName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: issueBalanceColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Available: $balIssueQty $uom',
+                        style: TextStyle(
+                          color: issueBalanceColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert,
+                        size: 20,
+                        color: Colors.grey,
+                      ),
+                      onSelected: (String value) {
+                        if (value == 'edit') {
+                          onEdit?.call(materialName);
+                        } else if (value == 'delete') {
+                          onDelete?.call(materialName);
+                        }
+                      },
+                      itemBuilder: (BuildContext context) =>
+                          <PopupMenuEntry<String>>[
+                            const PopupMenuItem<String>(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.edit,
+                                    size: 16,
+                                    color: Colors.blue,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Edit'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete,
+                                    size: 16,
+                                    color: Colors.red,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Delete'),
+                                ],
+                              ),
+                            ),
+                          ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // First Row - Required, Total Received, Balance
+            Row(
+              children: [
+                _buildStatChip('Required', requiredQty, Colors.blue),
+                const SizedBox(width: 8),
+                _buildStatChip(
+                  'Total Received',
+                  totalReceivedQty,
+                  Colors.green,
+                ),
+                const SizedBox(width: 8),
+                _buildStatChip('Balance', balanceQty.abs(), balanceColor),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Second Row - Total Issue, Balance Issue
+            Row(
+              children: [
+                _buildStatChip('Total Issue', totalIssueQty, Colors.orange),
+                const SizedBox(width: 8),
+                _buildStatChip('Bal Issue', balIssueQty, issueBalanceColor),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Tap to view details indicator
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
                 child: Text(
-                  materialName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                  'Tap to view details',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: issueBalanceColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Available: $balIssueQty $uom',
-                      style: TextStyle(
-                        color: issueBalanceColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
-                    onSelected: (String value) {
-                      if (value == 'edit') {
-                        onEdit?.call(materialName);
-                      } else if (value == 'delete') {
-                        onDelete?.call(materialName);
-                      }
-                    },
-                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                      const PopupMenuItem<String>(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 16, color: Colors.blue),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 16, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // First Row - Required, Total Received, Balance
-          Row(
-            children: [
-              _buildStatChip('Required', requiredQty, Colors.blue),
-              const SizedBox(width: 8),
-              _buildStatChip('Total Received', totalReceivedQty, Colors.green),
-              const SizedBox(width: 8),
-              _buildStatChip('Balance', balanceQty.abs(), balanceColor),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Second Row - Total Issue, Balance Issue
-          Row(
-            children: [
-              _buildStatChip('Total Issue', totalIssueQty, Colors.orange),
-              const SizedBox(width: 8),
-              _buildStatChip('Bal Issue', balIssueQty, issueBalanceColor),
-            ],
-          ),
-          
-          const SizedBox(height: 8),
-          
-          // Tap to view details indicator
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Center(
-              child: Text(
-                'Tap to view details',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   void _createInventoryReport(Sheet sheet, List<QueryDocumentSnapshot> docs) {
-    try { 
-    // Project info
-    sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue(
-      'INVENTORY REPORT',
-    );
-    sheet.cell(CellIndex.indexByString('A2')).value = TextCellValue(
-      'Generated on: ${DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now())}',
-    );
-
-    // Headers
-    sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue(
-      'MATERIAL NAME',
-    );
-    sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(
-      'REQUIRED QTY',
-    );
-    sheet.cell(CellIndex.indexByString('C4')).value = TextCellValue(
-      'TOTAL RECEIVED QTY',
-    );
-    sheet.cell(CellIndex.indexByString('D4')).value = TextCellValue(
-      'BALANCE QTY',
-    );
-    sheet.cell(CellIndex.indexByString('E4')).value = TextCellValue(
-      'TOTAL ISSUE QTY',
-    );
-    sheet.cell(CellIndex.indexByString('F4')).value = TextCellValue(
-      'AVAILABLE QTY',
-    );
-
-    // Add material data
-    for (int i = 0; i < docs.length; i++) {
-      final data = docs[i].data() as Map<String, dynamic>;
-      final row = 5 + i;
-
-      sheet.cell(CellIndex.indexByString('A$row')).value = TextCellValue(
-        data['materialName'] ?? '',
+    try {
+      // Project info
+      sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue(
+        'INVENTORY REPORT',
       );
-      sheet.cell(CellIndex.indexByString('B$row')).value = IntCellValue(
-        data['requiredQty'] ?? 0,
+      sheet.cell(CellIndex.indexByString('A2')).value = TextCellValue(
+        'Generated on: ${DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now())}',
       );
-      sheet.cell(CellIndex.indexByString('C$row')).value = IntCellValue(
-        data['totalReceivedQty'] ?? 0,
-      );
-      sheet.cell(CellIndex.indexByString('D$row')).value = IntCellValue(
-        data['balanceQty'] ?? 0,
-      );
-      sheet.cell(CellIndex.indexByString('E$row')).value = IntCellValue(
-        data['totalIssuedQty'] ?? 0,
-      );
-      sheet.cell(CellIndex.indexByString('F$row')).value = IntCellValue(
-        data['balIssueQty'] ?? 0,
-      );
-    }
 
-    // Add detailed entries section
-    int currentRow = 6 + docs.length;
+      // Headers
+      sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue(
+        'MATERIAL NAME',
+      );
+      sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(
+        'REQUIRED QTY',
+      );
+      sheet.cell(CellIndex.indexByString('C4')).value = TextCellValue(
+        'TOTAL RECEIVED QTY',
+      );
+      sheet.cell(CellIndex.indexByString('D4')).value = TextCellValue(
+        'BALANCE QTY',
+      );
+      sheet.cell(CellIndex.indexByString('E4')).value = TextCellValue(
+        'TOTAL ISSUE QTY',
+      );
+      sheet.cell(CellIndex.indexByString('F4')).value = TextCellValue(
+        'AVAILABLE QTY',
+      );
 
-    for (int i = 0; i < docs.length; i++) {
-      final data = docs[i].data() as Map<String, dynamic>;
-      final materialName = data['materialName'] ?? '';
-      final receivedEntries = data['receivedEntries'] ?? [];
-      final issuedEntries = data['issuedEntries'] ?? [];
+      // Add material data
+      for (int i = 0; i < docs.length; i++) {
+        final data = docs[i].data() as Map<String, dynamic>;
+        final row = 5 + i;
 
-      if (receivedEntries.isNotEmpty || issuedEntries.isNotEmpty) {
-        currentRow += 2;
-        sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-            TextCellValue('MATERIAL: $materialName');
-        currentRow++;
+        sheet.cell(CellIndex.indexByString('A$row')).value = TextCellValue(
+          data['materialName'] ?? '',
+        );
+        sheet.cell(CellIndex.indexByString('B$row')).value = IntCellValue(
+          data['requiredQty'] ?? 0,
+        );
+        sheet.cell(CellIndex.indexByString('C$row')).value = IntCellValue(
+          data['totalReceivedQty'] ?? 0,
+        );
+        sheet.cell(CellIndex.indexByString('D$row')).value = IntCellValue(
+          data['balanceQty'] ?? 0,
+        );
+        sheet.cell(CellIndex.indexByString('E$row')).value = IntCellValue(
+          data['totalIssuedQty'] ?? 0,
+        );
+        sheet.cell(CellIndex.indexByString('F$row')).value = IntCellValue(
+          data['balIssueQty'] ?? 0,
+        );
+      }
 
-        if (receivedEntries.isNotEmpty) {
+      // Add detailed entries section
+      int currentRow = 6 + docs.length;
+
+      for (int i = 0; i < docs.length; i++) {
+        final data = docs[i].data() as Map<String, dynamic>;
+        final materialName = data['materialName'] ?? '';
+        final receivedEntries = data['receivedEntries'] ?? [];
+        final issuedEntries = data['issuedEntries'] ?? [];
+
+        if (receivedEntries.isNotEmpty || issuedEntries.isNotEmpty) {
+          currentRow += 2;
           sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-              TextCellValue('RECEIVED ENTRIES:');
-          currentRow++;
-          sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-              TextCellValue('Challan No');
-          sheet.cell(CellIndex.indexByString('B$currentRow')).value =
-              TextCellValue('Date');
-          sheet.cell(CellIndex.indexByString('C$currentRow')).value =
-              TextCellValue('Quantity');
+              TextCellValue('MATERIAL: $materialName');
           currentRow++;
 
-          for (var entry in receivedEntries) {
+          if (receivedEntries.isNotEmpty) {
             sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-                TextCellValue(entry['challanNo'] ?? '');
-            sheet.cell(CellIndex.indexByString('B$currentRow')).value =
-                TextCellValue(entry['date'] ?? '');
-            sheet.cell(CellIndex.indexByString('C$currentRow')).value =
-                IntCellValue(entry['qty'] ?? 0);
+                TextCellValue('RECEIVED ENTRIES:');
             currentRow++;
+            sheet.cell(CellIndex.indexByString('A$currentRow')).value =
+                TextCellValue('Challan No');
+            sheet.cell(CellIndex.indexByString('B$currentRow')).value =
+                TextCellValue('Date');
+            sheet.cell(CellIndex.indexByString('C$currentRow')).value =
+                TextCellValue('Quantity');
+            currentRow++;
+
+            for (var entry in receivedEntries) {
+              sheet.cell(CellIndex.indexByString('A$currentRow')).value =
+                  TextCellValue(entry['challanNo'] ?? '');
+              sheet.cell(CellIndex.indexByString('B$currentRow')).value =
+                  TextCellValue(entry['date'] ?? '');
+              sheet.cell(CellIndex.indexByString('C$currentRow')).value =
+                  IntCellValue(entry['qty'] ?? 0);
+              currentRow++;
+            }
           }
-        }
 
-        if (issuedEntries.isNotEmpty) {
-          currentRow++;
-          sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-              TextCellValue('ISSUED ENTRIES:');
-          currentRow++;
-          sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-              TextCellValue('Challan No');
-          sheet.cell(CellIndex.indexByString('B$currentRow')).value =
-              TextCellValue('Date');
-          sheet.cell(CellIndex.indexByString('C$currentRow')).value =
-              TextCellValue('Quantity');
-          sheet.cell(CellIndex.indexByString('D$currentRow')).value =
-              TextCellValue('Contractor');
-          currentRow++;
-
-          for (var entry in issuedEntries) {
-            sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-                TextCellValue(entry['challanNo'] ?? '');
-            sheet.cell(CellIndex.indexByString('B$currentRow')).value =
-                TextCellValue(entry['date'] ?? '');
-            sheet.cell(CellIndex.indexByString('C$currentRow')).value =
-                IntCellValue(entry['qty'] ?? 0);
-            sheet.cell(CellIndex.indexByString('D$currentRow')).value =
-                TextCellValue(entry['contractorName'] ?? '');
+          if (issuedEntries.isNotEmpty) {
             currentRow++;
+            sheet.cell(CellIndex.indexByString('A$currentRow')).value =
+                TextCellValue('ISSUED ENTRIES:');
+            currentRow++;
+            sheet.cell(CellIndex.indexByString('A$currentRow')).value =
+                TextCellValue('Challan No');
+            sheet.cell(CellIndex.indexByString('B$currentRow')).value =
+                TextCellValue('Date');
+            sheet.cell(CellIndex.indexByString('C$currentRow')).value =
+                TextCellValue('Quantity');
+            sheet.cell(CellIndex.indexByString('D$currentRow')).value =
+                TextCellValue('Contractor');
+            currentRow++;
+
+            for (var entry in issuedEntries) {
+              sheet.cell(CellIndex.indexByString('A$currentRow')).value =
+                  TextCellValue(entry['challanNo'] ?? '');
+              sheet.cell(CellIndex.indexByString('B$currentRow')).value =
+                  TextCellValue(entry['date'] ?? '');
+              sheet.cell(CellIndex.indexByString('C$currentRow')).value =
+                  IntCellValue(entry['qty'] ?? 0);
+              sheet.cell(CellIndex.indexByString('D$currentRow')).value =
+                  TextCellValue(entry['contractorName'] ?? '');
+              currentRow++;
+            }
           }
         }
       }
-    }
-    }catch(e){
+    } catch (e) {
       print('Error creating inventory report: $e');
     }
   }
@@ -3886,90 +4014,95 @@ void _showEditDialog(String materialName, String itemId) {
 
   // Fixed Upload Excel function
   Future<void> _uploadInventoryExcel() async {
-    if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.addInventoryProject)) 
-        {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'],
-      );
-      print('File picker result: $result');
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.addInventoryProject,
+    )) {
+      try {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['xlsx', 'xls'],
+        );
+        print('File picker result: $result');
 
-      if (result != null && result.files.single.path != null) {
-        final file = result.files.first;
+        if (result != null && result.files.single.path != null) {
+          final file = result.files.first;
 
-        // Read bytes from file path instead of using file.bytes
-        Uint8List bytes;
-        if (file.bytes != null) {
-          bytes = file.bytes!;
-        } else if (file.path != null) {
-          // Read file from path
-          final dartFile = File(file.path!);
-          bytes = await dartFile.readAsBytes();
-        } else {
-          throw Exception('Unable to read file data');
+          // Read bytes from file path instead of using file.bytes
+          Uint8List bytes;
+          if (file.bytes != null) {
+            bytes = file.bytes!;
+          } else if (file.path != null) {
+            // Read file from path
+            final dartFile = File(file.path!);
+            bytes = await dartFile.readAsBytes();
+          } else {
+            throw Exception('Unable to read file data');
+          }
+
+          // Parse Excel file
+          var excel = Excel.decodeBytes(bytes);
+          var table = excel.tables[excel.tables.keys.first];
+
+          if (table == null) {
+            throw Exception('No data found in Excel file');
+          }
+
+          // Process the Excel data (only material name and required qty)
+          await _processInventoryExcel(table);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Inventory uploaded successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
         }
-
-        // Parse Excel file
-        var excel = Excel.decodeBytes(bytes);
-        var table = excel.tables[excel.tables.keys.first];
-
-        if (table == null) {
-          throw Exception('No data found in Excel file');
-        }
-
-        // Process the Excel data (only material name and required qty)
-        await _processInventoryExcel(table);
-
+      } catch (e) {
+        print('Error uploading inventory: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Inventory uploaded successfully'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Error uploading inventory: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      print('Error uploading inventory: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error uploading inventory: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-    }else{
+    } else {
       await ErrorDialog.show(
         context,
-        title: 'Permission Denied', 
-        message: 'You do not have permission to upload inventory items.');
+        title: 'Permission Denied',
+        message: 'You do not have permission to upload inventory items.',
+      );
     }
   }
 
   // Show Update Inventory Dialog
   void _showUpdateInventoryDialog() async {
-    if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.updateInventoryProject)) 
-        {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.9,
-            height: MediaQuery.of(context).size.height * 0.8,
-            child: UpdateInventoryDialog(projectId: widget.projectId),
-          ),
-        );
-      },
-    );
-    }
-    else{
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.updateInventoryProject,
+    )) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.9,
+              height: MediaQuery.of(context).size.height * 0.8,
+              child: UpdateInventoryDialog(projectId: widget.projectId),
+            ),
+          );
+        },
+      );
+    } else {
       await ErrorDialog.show(
         context,
-        title: 'Permission Denied', 
-        message: 'You do not have permission to update inventory items.');
+        title: 'Permission Denied',
+        message: 'You do not have permission to update inventory items.',
+      );
     }
   }
 
@@ -4682,6 +4815,7 @@ void _showEditDialog(String materialName, String itemId) {
       ),
     );
   }
+
   Widget _buildReportsTab() {
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -6405,350 +6539,9 @@ void _showEditDialog(String materialName, String itemId) {
     return pdf;
   }
 
-void _createInventoryPdf(pw.Document pdf) {
-  final inventoryData = _previewData!['inventoryData'] as List<DocumentSnapshot>;
-
-  pdf.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(20),
-      build: (pw.Context context) {
-        return [
-          // Header with company styling
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.blue900,
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            padding: const pw.EdgeInsets.all(16),
-            child: pw.Column(
-              children: [
-                pw.Text(
-                  'INVENTORY REPORT',
-                  style: pw.TextStyle(
-                    fontSize: 24,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.white,
-                  ),
-                ),
-                pw.SizedBox(height: 8),
-                pw.Text(
-                  'Generated on ${DateFormat('dd MMMM yyyy').format(DateTime.now())}',
-                  style: pw.TextStyle(
-                    fontSize: 12,
-                    color: PdfColors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 20),
-
-          // Project Information Card
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey300),
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            padding: const pw.EdgeInsets.all(16),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'Project Information',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.blue900,
-                  ),
-                ),
-                pw.SizedBox(height: 12),
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(
-                            'Project Name:',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                          ),
-                          pw.Text(widget.projectName),
-                        ],
-                      ),
-                    ),
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(
-                            'Customer Name:',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                          ),
-                          pw.Text('VIMAN NAGAR SHUBH VENTURES LLP'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 24),
-
-          // Materials Table with improved styling
-          pw.Text(
-            'Inventory Details',
-            style: pw.TextStyle(
-              fontSize: 18,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.blue900,
-            ),
-          ),
-          pw.SizedBox(height: 12),
-          
-          pw.Table(
-            border: pw.TableBorder.all(
-              color: PdfColors.grey400,
-              width: 1,
-            ),
-            columnWidths: {
-              0: const pw.FlexColumnWidth(3),
-              1: const pw.FlexColumnWidth(1.5),
-              2: const pw.FlexColumnWidth(1.5),
-              3: const pw.FlexColumnWidth(1.5),
-              4: const pw.FlexColumnWidth(1.5),
-              5: const pw.FlexColumnWidth(1.5),
-            },
-            children: [
-              // Header row
-              pw.TableRow(
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.blue100,
-                ),
-                children: [
-                  _buildTableCell('MATERIAL NAME', isHeader: true),
-                  _buildTableCell('REQUIRED\nQTY', isHeader: true),
-                  _buildTableCell('RECEIVED\nQTY', isHeader: true),
-                  _buildTableCell('BALANCE\nQTY', isHeader: true),
-                  _buildTableCell('ISSUED\nQTY', isHeader: true),
-                  _buildTableCell('REMAINING\nQTY', isHeader: true),
-                ],
-              ),
-              // Data rows
-              ...inventoryData.map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final isEvenRow = inventoryData.indexOf(doc) % 2 == 0;
-                
-                return pw.TableRow(
-                  decoration: pw.BoxDecoration(
-                    color: isEvenRow ? PdfColors.grey50 : PdfColors.white,
-                  ),
-                  children: [
-                    _buildTableCell(data['materialName'] ?? ''),
-                    _buildTableCell('${data['requiredQty'] ?? 0}', isNumeric: true),
-                    _buildTableCell('${data['totalReceivedQty'] ?? 0}', isNumeric: true),
-                    _buildTableCell('${data['balanceQty'] ?? 0}', isNumeric: true),
-                    _buildTableCell('${data['totalIssuedQty'] ?? 0}', isNumeric: true),
-                    _buildTableCell('${data['balIssueQty'] ?? 0}', isNumeric: true),
-                  ],
-                );
-              }).toList(),
-            ],
-          ),
-          
-          pw.SizedBox(height: 20),
-          
-          // Summary section
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.grey100,
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            padding: const pw.EdgeInsets.all(16),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'Summary',
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 8),
-                pw.Text('Total Materials: ${inventoryData.length}'),
-                pw.Text('Report Generated: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}'),
-              ],
-            ),
-          ),
-        ];
-      },
-      footer: (pw.Context context) {
-        return pw.Container(
-          alignment: pw.Alignment.centerRight,
-          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-          child: pw.Text(
-            'Page ${context.pageNumber} of ${context.pagesCount}',
-            style: const pw.TextStyle(fontSize: 10),
-          ),
-        );
-      },
-    ),
-  );
-}
-void _createInstallationPdf(pw.Document pdf) {
-  final tasksData = _previewData!['tasksData'] as List<DocumentSnapshot>;
-
-  pdf.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat.a4.landscape, // Landscape for better table fit
-      margin: const pw.EdgeInsets.all(20),
-      build: (pw.Context context) {
-        return [
-          // Header
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.green900,
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            padding: const pw.EdgeInsets.all(16),
-            child: pw.Column(
-              children: [
-                pw.Text(
-                  'INSTALLATION PROGRESS REPORT',
-                  style: pw.TextStyle(
-                    fontSize: 24,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.white,
-                  ),
-                ),
-                pw.SizedBox(height: 8),
-                pw.Text(
-                  'Project: ${widget.projectName}',
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    color: PdfColors.white,
-                  ),
-                ),
-                pw.Text(
-                  'Report Date: ${DateFormat('dd MMMM yyyy').format(DateTime.now())}',
-                  style: pw.TextStyle(
-                    fontSize: 12,
-                    color: PdfColors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 20),
-
-          // Progress Legend
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey300),
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            padding: const pw.EdgeInsets.all(16),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildProgressLegend('Door + Frame + Hardware', '60%', PdfColors.blue),
-                _buildProgressLegend('Architrave Installation', '30%', PdfColors.orange),
-                _buildProgressLegend('Handover Complete', '10%', PdfColors.green),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 24),
-
-          // Installation Table
-          pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.grey400),
-            columnWidths: {
-              0: const pw.FlexColumnWidth(1),
-              1: const pw.FlexColumnWidth(1),
-              2: const pw.FlexColumnWidth(2),
-              3: const pw.FlexColumnWidth(1.5),
-              4: const pw.FlexColumnWidth(1),
-              5: const pw.FlexColumnWidth(1),
-              6: const pw.FlexColumnWidth(1),
-              7: const pw.FlexColumnWidth(1.5),
-              8: const pw.FlexColumnWidth(2),
-            },
-            children: [
-              // Header
-              pw.TableRow(
-                decoration: pw.BoxDecoration(color: PdfColors.green100),
-                children: [
-                  _buildTableCell('BUILDING', isHeader: true),
-                  _buildTableCell('FLAT', isHeader: true),
-                  _buildTableCell('MATERIAL GROUP', isHeader: true),
-                  _buildTableCell('LOCATION', isHeader: true),
-                  _buildTableCell('DOOR +\nFRAME +\nHARDWARE', isHeader: true),
-                  _buildTableCell('ARCHITRAVE', isHeader: true),
-                  _buildTableCell('HANDOVER', isHeader: true),
-                  _buildTableCell('TOTAL\nPROGRESS', isHeader: true),
-                  _buildTableCell('REMARKS', isHeader: true),
-                ],
-              ),
-              // Data rows
-              ...tasksData.map((task) {
-                final data = task.data() as Map<String, dynamic>;
-                final isEvenRow = tasksData.indexOf(task) % 2 == 0;
-                
-                // Convert boolean to int and calculate progress
-                final doorFrameHardware = data['doorFrameHardware'] == true ? 1 : 0;
-                final architrave = data['architrave'] == true ? 1 : 0;
-                final handover = data['handover'] == true ? 1 : 0;
-                final totalProgress = (doorFrameHardware * 60) + (architrave * 30) + (handover * 10);
-                
-                return pw.TableRow(
-                  decoration: pw.BoxDecoration(
-                    color: isEvenRow ? PdfColors.grey50 : PdfColors.white,
-                  ),
-                  children: [
-                    _buildTableCell(data['buildingNo'] ?? ''),
-                    _buildTableCell(data['flatNo'] ?? ''),
-                    _buildTableCell(data['materialGroup'] ?? ''),
-                    _buildTableCell(data['location'] ?? ''),
-                    _buildTableCell(doorFrameHardware == 1 ? '✓' : '○', isNumeric: true),
-                    _buildTableCell(architrave == 1 ? '✓' : '○', isNumeric: true),
-                    _buildTableCell(handover == 1 ? '✓' : '○', isNumeric: true),
-                    _buildTableCell('$totalProgress%', isNumeric: true),
-                    _buildTableCell(data['remark'] ?? ''),
-                  ],
-                );
-              }).toList(),
-            ],
-          ),
-        ];
-      },
-      footer: (pw.Context context) {
-        return pw.Container(
-          alignment: pw.Alignment.centerRight,
-          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-          child: pw.Text(
-            'Page ${context.pageNumber} of ${context.pagesCount}',
-            style: const pw.TextStyle(fontSize: 10),
-          ),
-        );
-      },
-    ),
-  );
-}
-
-void _createEntryRecipePdf(pw.Document pdf) {
-  final groupedEntries = _previewData!['groupedEntries'] as Map<String, List<Map<String, dynamic>>>;
-
-  for (String challanNo in groupedEntries.keys) {
-    final entries = groupedEntries[challanNo]!;
-    final firstEntry = entries.first;
+  void _createInventoryPdf(pw.Document pdf) {
+    final inventoryData =
+        _previewData!['inventoryData'] as List<DocumentSnapshot>;
 
     pdf.addPage(
       pw.MultiPage(
@@ -6756,18 +6549,18 @@ void _createEntryRecipePdf(pw.Document pdf) {
         margin: const pw.EdgeInsets.all(20),
         build: (pw.Context context) {
           return [
-            // Header
+            // Header with company styling
             pw.Container(
               width: double.infinity,
               decoration: pw.BoxDecoration(
-                color: PdfColors.purple900,
+                color: PdfColors.blue900,
                 borderRadius: pw.BorderRadius.circular(8),
               ),
               padding: const pw.EdgeInsets.all(16),
               child: pw.Column(
                 children: [
                   pw.Text(
-                    'MATERIAL RECEIPT ENTRY',
+                    'INVENTORY REPORT',
                     style: pw.TextStyle(
                       fontSize: 24,
                       fontWeight: pw.FontWeight.bold,
@@ -6776,38 +6569,65 @@ void _createEntryRecipePdf(pw.Document pdf) {
                   ),
                   pw.SizedBox(height: 8),
                   pw.Text(
-                    'Challan No: $challanNo',
-                    style: pw.TextStyle(
-                      fontSize: 16,
-                      color: PdfColors.white,
-                    ),
+                    'Generated on ${DateFormat('dd MMMM yyyy').format(DateTime.now())}',
+                    style: pw.TextStyle(fontSize: 12, color: PdfColors.white),
                   ),
                 ],
               ),
             ),
             pw.SizedBox(height: 20),
 
-            // Receipt Information
+            // Project Information Card
             pw.Container(
               width: double.infinity,
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: PdfColors.grey300),
                 borderRadius: pw.BorderRadius.circular(8),
               ),
-              child: pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey300),
+              padding: const pw.EdgeInsets.all(16),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.TableRow(
-                    decoration: pw.BoxDecoration(color: PdfColors.purple50),
-                    children: [
-                      _buildInfoCell('Challan Number:', challanNo),
-                      _buildInfoCell('Contractor:', firstEntry['contractorName'] ?? ''),
-                    ],
+                  pw.Text(
+                    'Project Information',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.blue900,
+                    ),
                   ),
-                  pw.TableRow(
+                  pw.SizedBox(height: 12),
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      _buildInfoCell('Receipt Date:', firstEntry['date'] ?? ''),
-                      _buildInfoCell('Project Name:', widget.projectName),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'Project Name:',
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.Text(widget.projectName),
+                          ],
+                        ),
+                      ),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'Customer Name:',
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.Text('VIMAN NAGAR SHUBH VENTURES LLP'),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -6815,52 +6635,104 @@ void _createEntryRecipePdf(pw.Document pdf) {
             ),
             pw.SizedBox(height: 24),
 
-            // Materials Table
+            // Materials Table with improved styling
             pw.Text(
-              'Materials Received',
+              'Inventory Details',
               style: pw.TextStyle(
                 fontSize: 18,
                 fontWeight: pw.FontWeight.bold,
-                color: PdfColors.purple900,
+                color: PdfColors.blue900,
               ),
             ),
             pw.SizedBox(height: 12),
-            
+
             pw.Table(
-              border: pw.TableBorder.all(color: PdfColors.grey400),
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 1),
               columnWidths: {
                 0: const pw.FlexColumnWidth(3),
-                1: const pw.FlexColumnWidth(1),
+                1: const pw.FlexColumnWidth(1.5),
                 2: const pw.FlexColumnWidth(1.5),
                 3: const pw.FlexColumnWidth(1.5),
+                4: const pw.FlexColumnWidth(1.5),
+                5: const pw.FlexColumnWidth(1.5),
               },
               children: [
-                // Header
+                // Header row
                 pw.TableRow(
-                  decoration: pw.BoxDecoration(color: PdfColors.purple100),
+                  decoration: pw.BoxDecoration(color: PdfColors.blue100),
                   children: [
                     _buildTableCell('MATERIAL NAME', isHeader: true),
-                    _buildTableCell('UOM', isHeader: true),
                     _buildTableCell('REQUIRED\nQTY', isHeader: true),
                     _buildTableCell('RECEIVED\nQTY', isHeader: true),
+                    _buildTableCell('BALANCE\nQTY', isHeader: true),
+                    _buildTableCell('ISSUED\nQTY', isHeader: true),
+                    _buildTableCell('REMAINING\nQTY', isHeader: true),
                   ],
                 ),
-                // Data
-                ...entries.map((entry) {
-                  final isEvenRow = entries.indexOf(entry) % 2 == 0;
+                // Data rows
+                ...inventoryData.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final isEvenRow = inventoryData.indexOf(doc) % 2 == 0;
+
                   return pw.TableRow(
                     decoration: pw.BoxDecoration(
                       color: isEvenRow ? PdfColors.grey50 : PdfColors.white,
                     ),
                     children: [
-                      _buildTableCell(entry['materialName'] ?? ''),
-                      _buildTableCell(entry['uom'] ?? 'NOS', isNumeric: true),
-                      _buildTableCell('${entry['requiredQty'] ?? 0}', isNumeric: true),
-                      _buildTableCell('${entry['receivedQty'] ?? 0}', isNumeric: true),
+                      _buildTableCell(data['materialName'] ?? ''),
+                      _buildTableCell(
+                        '${data['requiredQty'] ?? 0}',
+                        isNumeric: true,
+                      ),
+                      _buildTableCell(
+                        '${data['totalReceivedQty'] ?? 0}',
+                        isNumeric: true,
+                      ),
+                      _buildTableCell(
+                        '${data['balanceQty'] ?? 0}',
+                        isNumeric: true,
+                      ),
+                      _buildTableCell(
+                        '${data['totalIssuedQty'] ?? 0}',
+                        isNumeric: true,
+                      ),
+                      _buildTableCell(
+                        '${data['balIssueQty'] ?? 0}',
+                        isNumeric: true,
+                      ),
                     ],
                   );
                 }).toList(),
               ],
+            ),
+
+            pw.SizedBox(height: 20),
+
+            // Summary section
+            pw.Container(
+              width: double.infinity,
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              padding: const pw.EdgeInsets.all(16),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Summary',
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Text('Total Materials: ${inventoryData.length}'),
+                  pw.Text(
+                    'Report Generated: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+                  ),
+                ],
+              ),
             ),
           ];
         },
@@ -6869,7 +6741,7 @@ void _createEntryRecipePdf(pw.Document pdf) {
             alignment: pw.Alignment.centerRight,
             margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
             child: pw.Text(
-              'Page ${context.pageNumber} of ${context.pagesCount} - Challan: $challanNo',
+              'Page ${context.pageNumber} of ${context.pagesCount}',
               style: const pw.TextStyle(fontSize: 10),
             ),
           );
@@ -6877,18 +6749,14 @@ void _createEntryRecipePdf(pw.Document pdf) {
       ),
     );
   }
-}
 
-void _createIssueRecipePdf(pw.Document pdf) {
-  final groupedEntries = _previewData!['groupedEntries'] as Map<String, List<Map<String, dynamic>>>;
-
-  for (String challanNo in groupedEntries.keys) {
-    final entries = groupedEntries[challanNo]!;
-    final firstEntry = entries.first;
+  void _createInstallationPdf(pw.Document pdf) {
+    final tasksData = _previewData!['tasksData'] as List<DocumentSnapshot>;
 
     pdf.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        pageFormat:
+            PdfPageFormat.a4.landscape, // Landscape for better table fit
         margin: const pw.EdgeInsets.all(20),
         build: (pw.Context context) {
           return [
@@ -6896,14 +6764,14 @@ void _createIssueRecipePdf(pw.Document pdf) {
             pw.Container(
               width: double.infinity,
               decoration: pw.BoxDecoration(
-                color: PdfColors.red900,
+                color: PdfColors.green900,
                 borderRadius: pw.BorderRadius.circular(8),
               ),
               padding: const pw.EdgeInsets.all(16),
               child: pw.Column(
                 children: [
                   pw.Text(
-                    'MATERIAL ISSUE RECIPE',
+                    'INSTALLATION PROGRESS REPORT',
                     style: pw.TextStyle(
                       fontSize: 24,
                       fontWeight: pw.FontWeight.bold,
@@ -6912,87 +6780,121 @@ void _createIssueRecipePdf(pw.Document pdf) {
                   ),
                   pw.SizedBox(height: 8),
                   pw.Text(
-                    'Challan No: $challanNo',
-                    style: pw.TextStyle(
-                      fontSize: 16,
-                      color: PdfColors.white,
-                    ),
+                    'Project: ${widget.projectName}',
+                    style: pw.TextStyle(fontSize: 14, color: PdfColors.white),
+                  ),
+                  pw.Text(
+                    'Report Date: ${DateFormat('dd MMMM yyyy').format(DateTime.now())}',
+                    style: pw.TextStyle(fontSize: 12, color: PdfColors.white),
                   ),
                 ],
               ),
             ),
             pw.SizedBox(height: 20),
 
-            // Transaction Information
+            // Progress Legend
             pw.Container(
               width: double.infinity,
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: PdfColors.grey300),
                 borderRadius: pw.BorderRadius.circular(8),
               ),
-              child: pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey300),
+              padding: const pw.EdgeInsets.all(16),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
                 children: [
-                  pw.TableRow(
-                    decoration: pw.BoxDecoration(color: PdfColors.red50),
-                    children: [
-                      _buildInfoCell('Transaction Date:', firstEntry['date'] ?? ''),
-                      _buildInfoCell('Challan Number:', challanNo),
-                    ],
+                  _buildProgressLegend(
+                    'Door + Frame + Hardware',
+                    '60%',
+                    PdfColors.blue,
                   ),
-                  pw.TableRow(
-                    children: [
-                      _buildInfoCell('Project Name:', widget.projectName),
-                      _buildInfoCell('Contractor:', firstEntry['contractorName'] ?? ''),
-                    ],
+                  _buildProgressLegend(
+                    'Architrave Installation',
+                    '30%',
+                    PdfColors.orange,
+                  ),
+                  _buildProgressLegend(
+                    'Handover Complete',
+                    '10%',
+                    PdfColors.green,
                   ),
                 ],
               ),
             ),
             pw.SizedBox(height: 24),
 
-            // Materials Table
-            pw.Text(
-              'Materials Issued',
-              style: pw.TextStyle(
-                fontSize: 18,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.red900,
-              ),
-            ),
-            pw.SizedBox(height: 12),
-            
+            // Installation Table
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey400),
               columnWidths: {
-                0: const pw.FlexColumnWidth(3),
+                0: const pw.FlexColumnWidth(1),
                 1: const pw.FlexColumnWidth(1),
-                2: const pw.FlexColumnWidth(1.5),
+                2: const pw.FlexColumnWidth(2),
                 3: const pw.FlexColumnWidth(1.5),
+                4: const pw.FlexColumnWidth(1),
+                5: const pw.FlexColumnWidth(1),
+                6: const pw.FlexColumnWidth(1),
+                7: const pw.FlexColumnWidth(1.5),
+                8: const pw.FlexColumnWidth(2),
               },
               children: [
                 // Header
                 pw.TableRow(
-                  decoration: pw.BoxDecoration(color: PdfColors.red100),
+                  decoration: pw.BoxDecoration(color: PdfColors.green100),
                   children: [
-                    _buildTableCell('MATERIAL NAME', isHeader: true),
-                    _buildTableCell('UOM', isHeader: true),
-                    _buildTableCell('AVAILABLE\nQTY', isHeader: true),
-                    _buildTableCell('ISSUED\nQTY', isHeader: true),
+                    _buildTableCell('BUILDING', isHeader: true),
+                    _buildTableCell('FLAT', isHeader: true),
+                    _buildTableCell('MATERIAL GROUP', isHeader: true),
+                    _buildTableCell('LOCATION', isHeader: true),
+                    _buildTableCell(
+                      'DOOR +\nFRAME +\nHARDWARE',
+                      isHeader: true,
+                    ),
+                    _buildTableCell('ARCHITRAVE', isHeader: true),
+                    _buildTableCell('HANDOVER', isHeader: true),
+                    _buildTableCell('TOTAL\nPROGRESS', isHeader: true),
+                    _buildTableCell('REMARKS', isHeader: true),
                   ],
                 ),
-                // Data
-                ...entries.map((entry) {
-                  final isEvenRow = entries.indexOf(entry) % 2 == 0;
+                // Data rows
+                ...tasksData.map((task) {
+                  final data = task.data() as Map<String, dynamic>;
+                  final isEvenRow = tasksData.indexOf(task) % 2 == 0;
+
+                  // Convert boolean to int and calculate progress
+                  final doorFrameHardware = data['doorFrameHardware'] == true
+                      ? 1
+                      : 0;
+                  final architrave = data['architrave'] == true ? 1 : 0;
+                  final handover = data['handover'] == true ? 1 : 0;
+                  final totalProgress =
+                      (doorFrameHardware * 60) +
+                      (architrave * 30) +
+                      (handover * 10);
+
                   return pw.TableRow(
                     decoration: pw.BoxDecoration(
                       color: isEvenRow ? PdfColors.grey50 : PdfColors.white,
                     ),
                     children: [
-                      _buildTableCell(entry['materialName'] ?? ''),
-                      _buildTableCell(entry['uom'] ?? 'NOS', isNumeric: true),
-                      _buildTableCell('${entry['totalReceivedQty'] ?? 0}', isNumeric: true),
-                      _buildTableCell('${entry['issueQty'] ?? 0}', isNumeric: true),
+                      _buildTableCell(data['buildingNo'] ?? ''),
+                      _buildTableCell(data['flatNo'] ?? ''),
+                      _buildTableCell(data['materialGroup'] ?? ''),
+                      _buildTableCell(data['location'] ?? ''),
+                      _buildTableCell(
+                        doorFrameHardware == 1 ? '✓' : '○',
+                        isNumeric: true,
+                      ),
+                      _buildTableCell(
+                        architrave == 1 ? '✓' : '○',
+                        isNumeric: true,
+                      ),
+                      _buildTableCell(
+                        handover == 1 ? '✓' : '○',
+                        isNumeric: true,
+                      ),
+                      _buildTableCell('$totalProgress%', isNumeric: true),
+                      _buildTableCell(data['remark'] ?? ''),
                     ],
                   );
                 }).toList(),
@@ -7005,7 +6907,7 @@ void _createIssueRecipePdf(pw.Document pdf) {
             alignment: pw.Alignment.centerRight,
             margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
             child: pw.Text(
-              'Page ${context.pageNumber} of ${context.pagesCount} - Challan: $challanNo',
+              'Page ${context.pageNumber} of ${context.pagesCount}',
               style: const pw.TextStyle(fontSize: 10),
             ),
           );
@@ -7013,80 +6915,378 @@ void _createIssueRecipePdf(pw.Document pdf) {
       ),
     );
   }
-}
 
-// Helper methods for consistent table styling
-pw.Widget _buildTableCell(String text, {bool isHeader = false, bool isNumeric = false}) {
-  return pw.Container(
-    padding: const pw.EdgeInsets.all(8),
-    child: pw.Text(
-      text,
-      style: pw.TextStyle(
-        fontSize: isHeader ? 10 : 9,
-        fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+  void _createEntryRecipePdf(pw.Document pdf) {
+    final groupedEntries =
+        _previewData!['groupedEntries']
+            as Map<String, List<Map<String, dynamic>>>;
+
+    for (String challanNo in groupedEntries.keys) {
+      final entries = groupedEntries[challanNo]!;
+      final firstEntry = entries.first;
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(20),
+          build: (pw.Context context) {
+            return [
+              // Header
+              pw.Container(
+                width: double.infinity,
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.purple900,
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                padding: const pw.EdgeInsets.all(16),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      'MATERIAL RECEIPT ENTRY',
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      'Challan No: $challanNo',
+                      style: pw.TextStyle(fontSize: 16, color: PdfColors.white),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+
+              // Receipt Information
+              pw.Container(
+                width: double.infinity,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey300),
+                  children: [
+                    pw.TableRow(
+                      decoration: pw.BoxDecoration(color: PdfColors.purple50),
+                      children: [
+                        _buildInfoCell('Challan Number:', challanNo),
+                        _buildInfoCell(
+                          'Contractor:',
+                          firstEntry['contractorName'] ?? '',
+                        ),
+                      ],
+                    ),
+                    pw.TableRow(
+                      children: [
+                        _buildInfoCell(
+                          'Receipt Date:',
+                          firstEntry['date'] ?? '',
+                        ),
+                        _buildInfoCell('Project Name:', widget.projectName),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 24),
+
+              // Materials Table
+              pw.Text(
+                'Materials Received',
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.purple900,
+                ),
+              ),
+              pw.SizedBox(height: 12),
+
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(3),
+                  1: const pw.FlexColumnWidth(1),
+                  2: const pw.FlexColumnWidth(1.5),
+                  3: const pw.FlexColumnWidth(1.5),
+                },
+                children: [
+                  // Header
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: PdfColors.purple100),
+                    children: [
+                      _buildTableCell('MATERIAL NAME', isHeader: true),
+                      _buildTableCell('UOM', isHeader: true),
+                      _buildTableCell('REQUIRED\nQTY', isHeader: true),
+                      _buildTableCell('RECEIVED\nQTY', isHeader: true),
+                    ],
+                  ),
+                  // Data
+                  ...entries.map((entry) {
+                    final isEvenRow = entries.indexOf(entry) % 2 == 0;
+                    return pw.TableRow(
+                      decoration: pw.BoxDecoration(
+                        color: isEvenRow ? PdfColors.grey50 : PdfColors.white,
+                      ),
+                      children: [
+                        _buildTableCell(entry['materialName'] ?? ''),
+                        _buildTableCell(entry['uom'] ?? 'NOS', isNumeric: true),
+                        _buildTableCell(
+                          '${entry['requiredQty'] ?? 0}',
+                          isNumeric: true,
+                        ),
+                        _buildTableCell(
+                          '${entry['receivedQty'] ?? 0}',
+                          isNumeric: true,
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+            ];
+          },
+          footer: (pw.Context context) {
+            return pw.Container(
+              alignment: pw.Alignment.centerRight,
+              margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+              child: pw.Text(
+                'Page ${context.pageNumber} of ${context.pagesCount} - Challan: $challanNo',
+                style: const pw.TextStyle(fontSize: 10),
+              ),
+            );
+          },
+        ),
+      );
+    }
+  }
+
+  void _createIssueRecipePdf(pw.Document pdf) {
+    final groupedEntries =
+        _previewData!['groupedEntries']
+            as Map<String, List<Map<String, dynamic>>>;
+
+    for (String challanNo in groupedEntries.keys) {
+      final entries = groupedEntries[challanNo]!;
+      final firstEntry = entries.first;
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(20),
+          build: (pw.Context context) {
+            return [
+              // Header
+              pw.Container(
+                width: double.infinity,
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.red900,
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                padding: const pw.EdgeInsets.all(16),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      'MATERIAL ISSUE RECIPE',
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      'Challan No: $challanNo',
+                      style: pw.TextStyle(fontSize: 16, color: PdfColors.white),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 20),
+
+              // Transaction Information
+              pw.Container(
+                width: double.infinity,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey300),
+                  children: [
+                    pw.TableRow(
+                      decoration: pw.BoxDecoration(color: PdfColors.red50),
+                      children: [
+                        _buildInfoCell(
+                          'Transaction Date:',
+                          firstEntry['date'] ?? '',
+                        ),
+                        _buildInfoCell('Challan Number:', challanNo),
+                      ],
+                    ),
+                    pw.TableRow(
+                      children: [
+                        _buildInfoCell('Project Name:', widget.projectName),
+                        _buildInfoCell(
+                          'Contractor:',
+                          firstEntry['contractorName'] ?? '',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 24),
+
+              // Materials Table
+              pw.Text(
+                'Materials Issued',
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.red900,
+                ),
+              ),
+              pw.SizedBox(height: 12),
+
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(3),
+                  1: const pw.FlexColumnWidth(1),
+                  2: const pw.FlexColumnWidth(1.5),
+                  3: const pw.FlexColumnWidth(1.5),
+                },
+                children: [
+                  // Header
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: PdfColors.red100),
+                    children: [
+                      _buildTableCell('MATERIAL NAME', isHeader: true),
+                      _buildTableCell('UOM', isHeader: true),
+                      _buildTableCell('AVAILABLE\nQTY', isHeader: true),
+                      _buildTableCell('ISSUED\nQTY', isHeader: true),
+                    ],
+                  ),
+                  // Data
+                  ...entries.map((entry) {
+                    final isEvenRow = entries.indexOf(entry) % 2 == 0;
+                    return pw.TableRow(
+                      decoration: pw.BoxDecoration(
+                        color: isEvenRow ? PdfColors.grey50 : PdfColors.white,
+                      ),
+                      children: [
+                        _buildTableCell(entry['materialName'] ?? ''),
+                        _buildTableCell(entry['uom'] ?? 'NOS', isNumeric: true),
+                        _buildTableCell(
+                          '${entry['totalReceivedQty'] ?? 0}',
+                          isNumeric: true,
+                        ),
+                        _buildTableCell(
+                          '${entry['issueQty'] ?? 0}',
+                          isNumeric: true,
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+            ];
+          },
+          footer: (pw.Context context) {
+            return pw.Container(
+              alignment: pw.Alignment.centerRight,
+              margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+              child: pw.Text(
+                'Page ${context.pageNumber} of ${context.pagesCount} - Challan: $challanNo',
+                style: const pw.TextStyle(fontSize: 10),
+              ),
+            );
+          },
+        ),
+      );
+    }
+  }
+
+  // Helper methods for consistent table styling
+  pw.Widget _buildTableCell(
+    String text, {
+    bool isHeader = false,
+    bool isNumeric = false,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: isHeader ? 10 : 9,
+          fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
+        textAlign: isNumeric ? pw.TextAlign.center : pw.TextAlign.left,
       ),
-      textAlign: isNumeric ? pw.TextAlign.center : pw.TextAlign.left,
-    ),
-  );
-}
+    );
+  }
 
-pw.Widget _buildInfoCell(String label, String value) {
-  return pw.Container(
-    padding: const pw.EdgeInsets.all(12),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          label,
-          style: pw.TextStyle(
-            fontSize: 10,
-            fontWeight: pw.FontWeight.bold,
-            color: PdfColors.grey700,
+  pw.Widget _buildInfoCell(String label, String value) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.grey700,
+            ),
           ),
-        ),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          value,
-          style: const pw.TextStyle(fontSize: 12),
-        ),
-      ],
-    ),
-  );
-}
+          pw.SizedBox(height: 4),
+          pw.Text(value, style: const pw.TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
 
-pw.Widget _buildProgressLegend(String label, String percentage, PdfColor color) {
-  return pw.Container(
-    padding: const pw.EdgeInsets.all(8),
-    child: pw.Column(
-      children: [
-        pw.Container(
-          width: 20,
-          height: 20,
-          decoration: pw.BoxDecoration(
-            color: color,
-            borderRadius: pw.BorderRadius.circular(10),
-          ),
-          child: pw.Center(
-            child: pw.Text(
-              percentage,
-              style: pw.TextStyle(
-                fontSize: 8,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
+  pw.Widget _buildProgressLegend(
+    String label,
+    String percentage,
+    PdfColor color,
+  ) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      child: pw.Column(
+        children: [
+          pw.Container(
+            width: 20,
+            height: 20,
+            decoration: pw.BoxDecoration(
+              color: color,
+              borderRadius: pw.BorderRadius.circular(10),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                percentage,
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                ),
               ),
             ),
           ),
-        ),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          label,
-          style: const pw.TextStyle(fontSize: 8),
-          textAlign: pw.TextAlign.center,
-        ),
-      ],
-    ),
-  );
-}
+          pw.SizedBox(height: 4),
+          pw.Text(
+            label,
+            style: const pw.TextStyle(fontSize: 8),
+            textAlign: pw.TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showSuccessNotification(String fileName) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -7242,6 +7442,7 @@ pw.Widget _buildProgressLegend(String label, String percentage, PdfColor color) 
       SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
+
   // Updated Tasks Tab Widget with Search
   Widget _buildTasksTab() {
     return Column(
@@ -7317,16 +7518,19 @@ pw.Widget _buildProgressLegend(String label, String percentage, PdfColor color) 
                     ),
                   ),
                   // Add these to your PopupMenuButton items
-const PopupMenuItem(
-  value: 'delete',
-  child: Row(
-    children: [
-      Icon(Icons.delete, color: Colors.red),
-      SizedBox(width: 8),
-      Text('Delete Tasks', style: TextStyle(color: Colors.red)),
-    ],
-  ),
-),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text(
+                          'Delete Tasks',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -7806,7 +8010,7 @@ const PopupMenuItem(
   }
 
   // Navigate to Update Task Page
-  Future<void> _navigateToUpdateTaskPage (
+  Future<void> _navigateToUpdateTaskPage(
     String taskId,
     String buildingNo,
     String flatNo,
@@ -7818,344 +8022,396 @@ const PopupMenuItem(
     bool architrave,
     bool handover,
   ) async {
-    if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.updatetaskProject)) 
-        {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => UpdateTaskPage(
-          projectId: widget.projectId,
-          taskId: taskId,
-          buildingNo: buildingNo,
-          flatNo: flatNo,
-          materialGroup: materialGroup,
-          location: location,
-          qty: qty,
-          remark: remark,
-          doorFrameHardware: doorFrameHardware,
-          architrave: architrave,
-          handover: handover,
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.updatetaskProject,
+    )) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UpdateTaskPage(
+            projectId: widget.projectId,
+            taskId: taskId,
+            buildingNo: buildingNo,
+            flatNo: flatNo,
+            materialGroup: materialGroup,
+            location: location,
+            qty: qty,
+            remark: remark,
+            doorFrameHardware: doorFrameHardware,
+            architrave: architrave,
+            handover: handover,
+          ),
         ),
-      ),
-    );
-    }else{
+      );
+    } else {
       await ErrorDialog.show(
-      context,
-      title: "Permission Denied",
-      message: "You do not have permission to Update tasks. Please contact the administrator.",
-    );
+        context,
+        title: "Permission Denied",
+        message:
+            "You do not have permission to Update tasks. Please contact the administrator.",
+      );
     }
   }
 
-  
-Future<void> _importTasksFromExcel() async {
-  if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.addtaskProject)) 
-        {
-  try {
-    // Step 1: Pick Excel file
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
-    );
+  Future<void> _importTasksFromExcel() async {
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.addtaskProject,
+    )) {
+      try {
+        // Step 1: Pick Excel file
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['xlsx', 'xls'],
+        );
 
-    if (result == null || result.files.single.path == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No file selected')),
-      );
-      return;
-    }
+        if (result == null || result.files.single.path == null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('No file selected')));
+          return;
+        }
 
-    Uint8List bytes;
-    if (result.files.single.bytes != null) {
-      bytes = result.files.single.bytes!;
-    } else {
-      final file = File(result.files.single.path!);
-      bytes = await file.readAsBytes();
-    }
+        Uint8List bytes;
+        if (result.files.single.bytes != null) {
+          bytes = result.files.single.bytes!;
+        } else {
+          final file = File(result.files.single.path!);
+          bytes = await file.readAsBytes();
+        }
 
-    final excel = Excel.decodeBytes(bytes);
-    // Step 2: Ask for number of floors
-    final floorsCount = await showDialog<int>(
-      context: context,
-      builder: (context) {
-        int tempFloors = 1;
-        return AlertDialog(
-          title: const Text("Select Floors"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Number of Floors",
-                  hintText: "e.g. 15",
+        final excel = Excel.decodeBytes(bytes);
+        // Step 2: Ask for number of floors
+        final floorsCount = await showDialog<int>(
+          context: context,
+          builder: (context) {
+            int tempFloors = 1;
+            return AlertDialog(
+              title: const Text("Select Floors"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "Number of Floors",
+                      hintText: "e.g. 15",
+                    ),
+                    onChanged: (val) {
+                      tempFloors = int.tryParse(val) ?? 1;
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, null),
+                  child: const Text("Cancel"),
                 ),
-                onChanged: (val) {
-                  tempFloors = int.tryParse(val) ?? 1;
-                },
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, tempFloors),
+                  child: const Text("Next"),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (floorsCount == null || floorsCount <= 0) return;
+
+        // Step 3: Parse Excel with better debugging
+        final sheet = excel.tables.values.first;
+        List<Map<String, dynamic>> floor1Tasks =
+            []; // Store floor 1 tasks separately
+        List<Map<String, dynamic>> allTasks = [];
+
+        print("Excel sheet maxRows: ${sheet.maxRows}");
+        print("Excel sheet maxColumns: ${sheet.maxColumns}");
+
+        // First, parse floor 1 tasks from Excel
+        for (int rowIndex = 1; rowIndex < sheet.maxRows; rowIndex++) {
+          final row = sheet.row(rowIndex);
+
+          // Debug: Print row data
+          print(
+            "Row $rowIndex: ${row.map((cell) => cell?.value?.toString() ?? 'null').toList()}",
+          );
+
+          // Skip completely empty rows
+          if (row.isEmpty ||
+              row.every(
+                (cell) =>
+                    cell?.value == null ||
+                    cell!.value.toString().trim().isEmpty,
+              )) {
+            continue;
+          }
+
+          final buildingNo = _getCellValue(row, 0).trim();
+          final flatNoStr = _getCellValue(row, 1).trim();
+          final materialGroup = _getCellValue(row, 2).trim();
+          final location = _getCellValue(row, 3).trim();
+          final qtyStr = _getCellValue(row, 4).trim();
+          final remark = row.length > 5 ? _getCellValue(row, 5).trim() : '';
+
+          // Debug: Print parsed values
+          print(
+            "Parsed - Building: $buildingNo, Flat: $flatNoStr, Material: $materialGroup, Location: $location, Qty: $qtyStr",
+          );
+
+          // Validate required fields
+          if (buildingNo.isEmpty ||
+              flatNoStr.isEmpty ||
+              materialGroup.isEmpty ||
+              location.isEmpty ||
+              qtyStr.isEmpty) {
+            print("Skipping row $rowIndex due to empty required fields");
+            continue;
+          }
+
+          final qty = int.tryParse(qtyStr) ?? 0;
+          if (qty <= 0) {
+            print("Skipping row $rowIndex due to invalid quantity: $qtyStr");
+            continue;
+          }
+
+          final flatNo = int.tryParse(flatNoStr) ?? 0;
+          if (flatNo == 0) {
+            print(
+              "Skipping row $rowIndex due to invalid flat number: $flatNoStr",
+            );
+            continue;
+          }
+
+          // Store floor 1 task
+          final floor1Task = {
+            'buildingNo': buildingNo,
+            'flatNo': flatNo,
+            'materialGroup': materialGroup,
+            'location': location,
+            'qty': qty,
+            'remark': remark,
+          };
+          floor1Tasks.add(floor1Task);
+          print("Added floor 1 task: $floor1Task");
+        }
+
+        print("Floor 1 tasks found: ${floor1Tasks.length}");
+
+        // Now generate tasks for all floors
+        for (int floor = 1; floor <= floorsCount; floor++) {
+          for (var task in floor1Tasks) {
+            // Calculate new flat number: (floor * 100) + (original flat % 100)
+            final originalFlat = task['flatNo'] as int;
+            final newFlatNo = (floor * 100) + (originalFlat % 100);
+
+            allTasks.add({
+              'buildingNo': task['buildingNo'],
+              'flatNo': newFlatNo.toInt(),
+              'materialGroup': task['materialGroup'],
+              'location': task['location'],
+              'qty': task['qty'],
+              'remark': task['remark'],
+              'doorFrameHardware': false,
+              'architrave': false,
+              'handover': false,
+              'createdAt': Timestamp.now(),
+            });
+          }
+        }
+
+        print("Total tasks generated: ${allTasks.length}");
+
+        // Step 4: Show enhanced preview
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            final floor1Preview = allTasks
+                .where((task) => task['flatNo'].toString().startsWith('1'))
+                .take(5)
+                .toList();
+            final floor2Preview = allTasks
+                .where((task) => task['flatNo'].toString().startsWith('2'))
+                .take(3)
+                .toList();
+
+            return AlertDialog(
+              title: const Text("Preview Import"),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "📁 File: ${result.files.single.name}",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              Text("🏢 Floors: $floorsCount"),
+                              Text(
+                                "📊 Total Flats Per Floor: ${floor1Tasks.length}",
+                              ),
+                              Text("📋 Total Tasks: ${allTasks.length}"),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Floor 1 Sample
+                      const Text(
+                        "🔹 Floor 1 Sample (from Excel):",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      ...floor1Preview.map(
+                        (task) => Padding(
+                          padding: const EdgeInsets.only(
+                            left: 16.0,
+                            bottom: 4.0,
+                          ),
+                          child: Text(
+                            "Flat ${task['flatNo']} | ${task['materialGroup']} | ${task['location']} | Qty: ${task['qty']}",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      if (floorsCount > 1) ...[
+                        const SizedBox(height: 16),
+                        const Text(
+                          "🔹 Floor 2 Sample (auto-generated):",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        ...floor2Preview.map(
+                          (task) => Padding(
+                            padding: const EdgeInsets.only(
+                              left: 16.0,
+                              bottom: 4.0,
+                            ),
+                            child: Text(
+                              "Flat ${task['flatNo']} | ${task['materialGroup']} | ${task['location']} | Qty: ${task['qty']}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      if (allTasks.isEmpty)
+                        const Card(
+                          color: Colors.orange,
+                          child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Text(
+                              "⚠️ No valid tasks found in Excel file. Please check the file format.",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text("Back"),
+                ),
+                ElevatedButton(
+                  onPressed: allTasks.isNotEmpty
+                      ? () => Navigator.pop(context, true)
+                      : null,
+                  child: const Text("Import"),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (proceed != true || allTasks.isEmpty) return;
+
+        // Step 5: Import tasks with progress
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Importing tasks...'),
+              ],
+            ),
+          ),
+        );
+
+        int successCount = 0;
+        int errorCount = 0;
+
+        for (var task in allTasks) {
+          try {
+            await FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('tasks')
+                .add(task);
+            successCount++;
+          } catch (e) {
+            print("Error importing task: $e");
+            errorCount++;
+          }
+        }
+
+        Navigator.of(context).pop(); // Close loading
+
+        // Step 6: Show result
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Import Results"),
+            content: Text(
+              "✅ Successfully imported: $successCount\n❌ Errors: $errorCount\n📊 Total: ${allTasks.length}\n🏢 Floors: $floorsCount\n📋 Tasks per floor: ${floor1Tasks.length}",
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, null),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, tempFloors),
-              child: const Text("Next"),
-            ),
-          ],
         );
-      },
-    );
-
-    if (floorsCount == null || floorsCount <= 0) return;
-
-    // Step 3: Parse Excel with better debugging
-    final sheet = excel.tables.values.first;
-    List<Map<String, dynamic>> floor1Tasks = []; // Store floor 1 tasks separately
-    List<Map<String, dynamic>> allTasks = [];
-
-    print("Excel sheet maxRows: ${sheet.maxRows}");
-    print("Excel sheet maxColumns: ${sheet.maxColumns}");
-
-    // First, parse floor 1 tasks from Excel
-    for (int rowIndex = 1; rowIndex < sheet.maxRows; rowIndex++) {
-      final row = sheet.row(rowIndex);
-
-      // Debug: Print row data
-      print("Row $rowIndex: ${row.map((cell) => cell?.value?.toString() ?? 'null').toList()}");
-
-      // Skip completely empty rows
-      if (row.isEmpty ||
-          row.every((cell) =>
-              cell?.value == null || cell!.value.toString().trim().isEmpty)) {
-        continue;
-      }
-
-      final buildingNo = _getCellValue(row, 0).trim();
-      final flatNoStr = _getCellValue(row, 1).trim();
-      final materialGroup = _getCellValue(row, 2).trim();
-      final location = _getCellValue(row, 3).trim();
-      final qtyStr = _getCellValue(row, 4).trim();
-      final remark = row.length > 5 ? _getCellValue(row, 5).trim() : '';
-
-      // Debug: Print parsed values
-      print("Parsed - Building: $buildingNo, Flat: $flatNoStr, Material: $materialGroup, Location: $location, Qty: $qtyStr");
-
-      // Validate required fields
-      if (buildingNo.isEmpty ||
-          flatNoStr.isEmpty ||
-          materialGroup.isEmpty ||
-          location.isEmpty ||
-          qtyStr.isEmpty) {
-        print("Skipping row $rowIndex due to empty required fields");
-        continue;
-      }
-
-      final qty = int.tryParse(qtyStr) ?? 0;
-      if (qty <= 0) {
-        print("Skipping row $rowIndex due to invalid quantity: $qtyStr");
-        continue;
-      }
-
-      final flatNo = int.tryParse(flatNoStr) ?? 0;
-      if (flatNo == 0) {
-        print("Skipping row $rowIndex due to invalid flat number: $flatNoStr");
-        continue;
-      }
-
-      // Store floor 1 task
-      final floor1Task = {
-        'buildingNo': buildingNo,
-        'flatNo': flatNo,
-        'materialGroup': materialGroup,
-        'location': location,
-        'qty': qty,
-        'remark': remark,
-      };
-      floor1Tasks.add(floor1Task);
-      print("Added floor 1 task: $floor1Task");
-    }
-
-    print("Floor 1 tasks found: ${floor1Tasks.length}");
-
-    // Now generate tasks for all floors
-    for (int floor = 1; floor <= floorsCount; floor++) {
-      for (var task in floor1Tasks) {
-        // Calculate new flat number: (floor * 100) + (original flat % 100)
-        final originalFlat = task['flatNo'] as int;
-        final newFlatNo = (floor * 100) + (originalFlat % 100);
-        
-        allTasks.add({
-          'buildingNo': task['buildingNo'],
-          'flatNo': newFlatNo.toInt(),
-          'materialGroup': task['materialGroup'],
-          'location': task['location'],
-          'qty': task['qty'],
-          'remark': task['remark'],
-          'doorFrameHardware': false,
-          'architrave': false,
-          'handover': false,
-          'createdAt': Timestamp.now(),
-        });
-      }
-    }
-
-    print("Total tasks generated: ${allTasks.length}");
-
-    // Step 4: Show enhanced preview
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final floor1Preview = allTasks.where((task) => task['flatNo'].toString().startsWith('1')).take(5).toList();
-        final floor2Preview = allTasks.where((task) => task['flatNo'].toString().startsWith('2')).take(3).toList();
-        
-        return AlertDialog(
-          title: const Text("Preview Import"),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 400,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("📁 File: ${result.files.single.name}", style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text("🏢 Floors: $floorsCount"),
-                          Text("📊 Total Flats Per Floor: ${floor1Tasks.length}"),
-                          Text("📋 Total Tasks: ${allTasks.length}"),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Floor 1 Sample
-                  const Text("🔹 Floor 1 Sample (from Excel):", style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ...floor1Preview.map((task) => Padding(
-                    padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
-                    child: Text(
-                      "Flat ${task['flatNo']} | ${task['materialGroup']} | ${task['location']} | Qty: ${task['qty']}",
-                      style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                    ),
-                  )),
-                  
-                  if (floorsCount > 1) ...[
-                    const SizedBox(height: 16),
-                    const Text("🔹 Floor 2 Sample (auto-generated):", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    ...floor2Preview.map((task) => Padding(
-                      padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
-                      child: Text(
-                        "Flat ${task['flatNo']} | ${task['materialGroup']} | ${task['location']} | Qty: ${task['qty']}",
-                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                      ),
-                    )),
-                  ],
-                  
-                  if (allTasks.isEmpty) 
-                    const Card(
-                      color: Colors.orange,
-                      child: Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Text("⚠️ No valid tasks found in Excel file. Please check the file format.", 
-                                   style: TextStyle(color: Colors.white)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Back"),
-            ),
-            ElevatedButton(
-              onPressed: allTasks.isNotEmpty ? () => Navigator.pop(context, true) : null,
-              child: const Text("Import"),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (proceed != true || allTasks.isEmpty) return;
-
-    // Step 5: Import tasks with progress
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Importing tasks...'),
-          ],
-        ),
-      ),
-    );
-
-    int successCount = 0;
-    int errorCount = 0;
-
-    for (var task in allTasks) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('projects')
-            .doc(widget.projectId)
-            .collection('tasks')
-            .add(task);
-        successCount++;
       } catch (e) {
-        print("Error importing task: $e");
-        errorCount++;
+        print("Import error: $e");
+        if (Navigator.canPop(context)) Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Import failed: $e")));
       }
+    } else {
+      await ErrorDialog.show(
+        context,
+        title: "Permission Denied",
+        message:
+            "You do not have permission to import tasks. Please contact the administrator.",
+      );
     }
-
-    Navigator.of(context).pop(); // Close loading
-
-    // Step 6: Show result
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Import Results"),
-        content: Text(
-          "✅ Successfully imported: $successCount\n❌ Errors: $errorCount\n📊 Total: ${allTasks.length}\n🏢 Floors: $floorsCount\n📋 Tasks per floor: ${floor1Tasks.length}",
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
-          ),
-        ],
-      ),
-    );
-  } catch (e) {
-    print("Import error: $e");
-    if (Navigator.canPop(context)) Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Import failed: $e")),
-    );
   }
-  }else{
-    await ErrorDialog.show(
-      context,
-      title: "Permission Denied",
-      message: "You do not have permission to import tasks. Please contact the administrator.",
-    );
-  }
-}
 
   // Helper method to safely get cell value
   String _getCellValue(List<Data?> row, int index) {
@@ -8166,205 +8422,216 @@ Future<void> _importTasksFromExcel() async {
   }
 
   void _navigateToMultiUpdatePage() async {
-    if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.addtaskProject)) 
-        {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MultiUpdateTaskPage(projectId: widget.projectId),
-      ),
-    );
-        } else {
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.addtaskProject,
+    )) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              MultiUpdateTaskPage(projectId: widget.projectId),
+        ),
+      );
+    } else {
       await ErrorDialog.show(
         context,
         title: 'Permission Denied',
-        message: 'You do not have permission to update tasks. Please contact the administrator.',
+        message:
+            'You do not have permission to update tasks. Please contact the administrator.',
       );
     }
   }
-// Add this method to navigate to delete tasks page
-void _navigateToDeleteTasksPage() async {
-  if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.addtaskProject)) 
-        {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => DeleteTasksPage(
-        projectId: widget.projectId,
-      ),
-    ),
-  );
-  } else {
-    await ErrorDialog.show(
-      context,
-      title: 'Permission Denied',
-      message: 'You do not have permission to delete tasks. Please contact the administrator.',
-    );
+
+  // Add this method to navigate to delete tasks page
+  void _navigateToDeleteTasksPage() async {
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.addtaskProject,
+    )) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DeleteTasksPage(projectId: widget.projectId),
+        ),
+      );
+    } else {
+      await ErrorDialog.show(
+        context,
+        title: 'Permission Denied',
+        message:
+            'You do not have permission to delete tasks. Please contact the administrator.',
+      );
+    }
   }
-}
+
   // Enhanced Download Excel Template with your specific format
   Future<void> _downloadExcelTemplate() async {
-    if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.addtaskProject)) 
-        {
-    try {
-      final excel = Excel.createExcel();
-      final sheet = excel['Task Template'];
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.addtaskProject,
+    )) {
+      try {
+        final excel = Excel.createExcel();
+        final sheet = excel['Task Template'];
 
-      // Add headers
-      final headers = [
-        'BUILDING NO',
-        'FLAT NO',
-        'MATERIAL GROUP',
-        'LOCATION',
-        'QTY',
-        'REMARK (Optional)',
-      ];
-
-      // Style headers
-      for (int i = 0; i < headers.length; i++) {
-        final cell = sheet.cell(
-          CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
-        );
-        cell.value = TextCellValue(headers[i]);
-        cell.cellStyle = CellStyle(
-          bold: true,
-          backgroundColorHex: ExcelColor.blue,
-          fontColorHex: ExcelColor.white,
-        );
-      }
-
-      // Add sample data based on your format
-      final sampleData = [
-        ['A', '101', 'MAIN DOOR SET', 'MD', '1', 'Main entrance door'],
-        ['A', '101', 'BEDROOM DOOR SET', 'BD', '1', 'Master bedroom'],
-        ['A', '101', 'BEDROOM DOOR SET', 'CB', '1', 'Child bedroom'],
-        ['A', '101', 'TOILET DOOR SET', 'CT', '1', 'Common toilet'],
-        ['A', '101', 'TOILET DOOR SET', 'MT', '1', 'Master toilet'],
-        ['A', '102', 'MAIN DOOR SET', 'MD', '1', ''],
-        ['A', '102', 'BEDROOM DOOR SET', 'BD', '1', ''],
-        ['A', '102', 'BEDROOM DOOR SET', 'CB', '1', ''],
-        ['A', '102', 'TOILET DOOR SET', 'CT', '1', ''],
-        ['A', '102', 'TOILET DOOR SET', 'MT', '1', ''],
-        ['B', '201', 'MAIN DOOR SET', 'MD', '1', 'Second floor unit'],
-        ['B', '202', 'WINDOW SET', 'LR', '2', 'Living room windows'],
-      ];
-
-      for (int rowIndex = 0; rowIndex < sampleData.length; rowIndex++) {
-        for (
-          int colIndex = 0;
-          colIndex < sampleData[rowIndex].length;
-          colIndex++
-        ) {
-          final cell = sheet.cell(
-            CellIndex.indexByColumnRow(
-              columnIndex: colIndex,
-              rowIndex: rowIndex + 1,
-            ),
-          );
-          cell.value = TextCellValue(sampleData[rowIndex][colIndex]);
-        }
-      }
-
-      // Auto-fit columns
-      for (int i = 0; i < headers.length; i++) {
-        sheet.setColumnAutoFit(i);
-      }
-
-      // Add instructions sheet
-      final instructionsSheet = excel['Instructions'];
-      final instructions = [
-        ['COLUMN', 'DESCRIPTION', 'REQUIRED', 'EXAMPLE'],
-        ['BUILDING NO', 'Building identifier', 'YES', 'A, B, C, etc.'],
-        ['FLAT NO', 'Flat/Unit number', 'YES', '101, 102, 201, etc.'],
-        [
+        // Add headers
+        final headers = [
+          'BUILDING NO',
+          'FLAT NO',
           'MATERIAL GROUP',
-          'Type of door/window set',
-          'YES',
-          'MAIN DOOR SET, BEDROOM DOOR SET, etc.',
-        ],
-        ['LOCATION', 'Location code', 'YES', 'MD, BD, CB, CT, MT, etc.'],
-        ['QTY', 'Quantity (number)', 'YES', '1, 2, 3, etc.'],
-        ['REMARK', 'Additional notes', 'NO', 'Any additional information'],
-      ];
+          'LOCATION',
+          'QTY',
+          'REMARK (Optional)',
+        ];
 
-      for (int rowIndex = 0; rowIndex < instructions.length; rowIndex++) {
-        for (
-          int colIndex = 0;
-          colIndex < instructions[rowIndex].length;
-          colIndex++
-        ) {
-          final cell = instructionsSheet.cell(
-            CellIndex.indexByColumnRow(
-              columnIndex: colIndex,
-              rowIndex: rowIndex,
-            ),
+        // Style headers
+        for (int i = 0; i < headers.length; i++) {
+          final cell = sheet.cell(
+            CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
           );
-          cell.value = TextCellValue(instructions[rowIndex][colIndex]);
+          cell.value = TextCellValue(headers[i]);
+          cell.cellStyle = CellStyle(
+            bold: true,
+            backgroundColorHex: ExcelColor.blue,
+            fontColorHex: ExcelColor.white,
+          );
+        }
 
-          if (rowIndex == 0) {
-            cell.cellStyle = CellStyle(
-              bold: true,
-              backgroundColorHex: ExcelColor.green,
-              fontColorHex: ExcelColor.white,
+        // Add sample data based on your format
+        final sampleData = [
+          ['A', '101', 'MAIN DOOR SET', 'MD', '1', 'Main entrance door'],
+          ['A', '101', 'BEDROOM DOOR SET', 'BD', '1', 'Master bedroom'],
+          ['A', '101', 'BEDROOM DOOR SET', 'CB', '1', 'Child bedroom'],
+          ['A', '101', 'TOILET DOOR SET', 'CT', '1', 'Common toilet'],
+          ['A', '101', 'TOILET DOOR SET', 'MT', '1', 'Master toilet'],
+          ['A', '102', 'MAIN DOOR SET', 'MD', '1', ''],
+          ['A', '102', 'BEDROOM DOOR SET', 'BD', '1', ''],
+          ['A', '102', 'BEDROOM DOOR SET', 'CB', '1', ''],
+          ['A', '102', 'TOILET DOOR SET', 'CT', '1', ''],
+          ['A', '102', 'TOILET DOOR SET', 'MT', '1', ''],
+          ['B', '201', 'MAIN DOOR SET', 'MD', '1', 'Second floor unit'],
+          ['B', '202', 'WINDOW SET', 'LR', '2', 'Living room windows'],
+        ];
+
+        for (int rowIndex = 0; rowIndex < sampleData.length; rowIndex++) {
+          for (
+            int colIndex = 0;
+            colIndex < sampleData[rowIndex].length;
+            colIndex++
+          ) {
+            final cell = sheet.cell(
+              CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex + 1,
+              ),
             );
+            cell.value = TextCellValue(sampleData[rowIndex][colIndex]);
           }
         }
-      }
 
-      final bytes = excel.encode();
-      if (bytes != null) {
-        await Printing.sharePdf(
-          bytes: Uint8List.fromList(bytes),
-          filename: 'task_import_template.xlsx',
-        );
+        // Auto-fit columns
+        for (int i = 0; i < headers.length; i++) {
+          sheet.setColumnAutoFit(i);
+        }
 
+        // Add instructions sheet
+        final instructionsSheet = excel['Instructions'];
+        final instructions = [
+          ['COLUMN', 'DESCRIPTION', 'REQUIRED', 'EXAMPLE'],
+          ['BUILDING NO', 'Building identifier', 'YES', 'A, B, C, etc.'],
+          ['FLAT NO', 'Flat/Unit number', 'YES', '101, 102, 201, etc.'],
+          [
+            'MATERIAL GROUP',
+            'Type of door/window set',
+            'YES',
+            'MAIN DOOR SET, BEDROOM DOOR SET, etc.',
+          ],
+          ['LOCATION', 'Location code', 'YES', 'MD, BD, CB, CT, MT, etc.'],
+          ['QTY', 'Quantity (number)', 'YES', '1, 2, 3, etc.'],
+          ['REMARK', 'Additional notes', 'NO', 'Any additional information'],
+        ];
+
+        for (int rowIndex = 0; rowIndex < instructions.length; rowIndex++) {
+          for (
+            int colIndex = 0;
+            colIndex < instructions[rowIndex].length;
+            colIndex++
+          ) {
+            final cell = instructionsSheet.cell(
+              CellIndex.indexByColumnRow(
+                columnIndex: colIndex,
+                rowIndex: rowIndex,
+              ),
+            );
+            cell.value = TextCellValue(instructions[rowIndex][colIndex]);
+
+            if (rowIndex == 0) {
+              cell.cellStyle = CellStyle(
+                bold: true,
+                backgroundColorHex: ExcelColor.green,
+                fontColorHex: ExcelColor.white,
+              );
+            }
+          }
+        }
+
+        final bytes = excel.encode();
+        if (bytes != null) {
+          await Printing.sharePdf(
+            bytes: Uint8List.fromList(bytes),
+            filename: 'task_import_template.xlsx',
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Template downloaded successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        print('Download template error: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Template downloaded successfully!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Download failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      print('Download template error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Download failed: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+    } else {
+      await ErrorDialog.show(
+        context,
+        title: 'Permission Denied',
+        message: 'You do not have permission to download the template.',
       );
     }
-      } else {
-    await ErrorDialog.show(
-      context,
-      title: 'Permission Denied',
-      message: 'You do not have permission to download the template.',
+  }
+
+  void _showErrorMessageDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber, color: Colors.orange.shade700),
+              SizedBox(width: 8),
+              Text(title),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK', style: TextStyle(color: Color(0xFF3B82F6))),
+            ),
+          ],
+        );
+      },
     );
   }
-  }
-  void _showErrorMessageDialog(String title, String message) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber, color: Colors.orange.shade700),
-            SizedBox(width: 8),
-            Text(title),
-          ],
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK', style: TextStyle(color: Color(0xFF3B82F6))),
-          ),
-        ],
-      );
-    },
-  );
-}
+
   // Add Task Method (with error handling)
   Future<void> _addTask() async {
     final buildingNoController = TextEditingController();
@@ -8373,142 +8640,145 @@ void _navigateToDeleteTasksPage() async {
     final locationController = TextEditingController();
     final qtyController = TextEditingController();
     final remarkController = TextEditingController();
-    if (await EmployeePermissionChecker.can(FirebaseAuth.instance.currentUser!.uid, EmployeePermission.addtaskProject)) 
-        {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Task'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: buildingNoController,
-                decoration: const InputDecoration(
-                  labelText: 'Building No *',
-                  border: OutlineInputBorder(),
+    if (await EmployeePermissionChecker.can(
+      FirebaseAuth.instance.currentUser!.uid,
+      EmployeePermission.addtaskProject,
+    )) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Add New Task'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: buildingNoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Building No *',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: flatNoController,
-                decoration: const InputDecoration(
-                  labelText: 'Flat No *',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: flatNoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Flat No *',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: materialGroupController,
-                decoration: const InputDecoration(
-                  labelText: 'Material Group *',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: materialGroupController,
+                  decoration: const InputDecoration(
+                    labelText: 'Material Group *',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Location *',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: locationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Location *',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: qtyController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Quantity *',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: qtyController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity *',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: remarkController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Remark (Optional)',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: remarkController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Remark (Optional)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // Validate required fields
+                if (buildingNoController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Building No is required')),
+                  );
+                  return;
+                }
+                if (flatNoController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Flat No is required')),
+                  );
+                  return;
+                }
+                if (materialGroupController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Material Group is required')),
+                  );
+                  return;
+                }
+                if (locationController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Location is required')),
+                  );
+                  return;
+                }
+                if (qtyController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Quantity is required')),
+                  );
+                  return;
+                }
+
+                try {
+                  await FirebaseFirestore.instance
+                      .collection('projects')
+                      .doc(widget.projectId)
+                      .collection('tasks')
+                      .add({
+                        'buildingNo': buildingNoController.text.trim(),
+                        'flatNo': int.parse(flatNoController.text.trim()),
+                        'materialGroup': materialGroupController.text.trim(),
+                        'location': locationController.text.trim(),
+                        'qty': int.tryParse(qtyController.text.trim()) ?? 0,
+                        'remark': remarkController.text.trim(),
+                        'doorFrameHardware': false,
+                        'architrave': false,
+                        'handover': false,
+                        'createdAt': Timestamp.now(),
+                      });
+
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Task added successfully!')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error adding task: ${e.toString()}'),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Add Task'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              // Validate required fields
-              if (buildingNoController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Building No is required')),
-                );
-                return;
-              }
-              if (flatNoController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Flat No is required')),
-                );
-                return;
-              }
-              if (materialGroupController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Material Group is required')),
-                );
-                return;
-              }
-              if (locationController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Location is required')),
-                );
-                return;
-              }
-              if (qtyController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Quantity is required')),
-                );
-                return;
-              }
-
-              try {
-                await FirebaseFirestore.instance
-                    .collection('projects')
-                    .doc(widget.projectId)
-                    .collection('tasks')
-                    .add({
-                      'buildingNo': buildingNoController.text.trim(),
-                      'flatNo':int.parse( flatNoController.text.trim()),
-                      'materialGroup': materialGroupController.text.trim(),
-                      'location': locationController.text.trim(),
-                      'qty': int.tryParse(qtyController.text.trim()) ?? 0,
-                      'remark': remarkController.text.trim(),
-                      'doorFrameHardware': false,
-                      'architrave': false,
-                      'handover': false,
-                      'createdAt': Timestamp.now(),
-                    });
-
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Task added successfully!')),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error adding task: ${e.toString()}')),
-                );
-              }
-            },
-            child: const Text('Add Task'),
-          ),
-        ],
-      ),
-      
-    );
-    }else {
+      );
+    } else {
       if (mounted) {
         await ErrorDialog.show(
           context,
@@ -8516,5 +8786,6 @@ void _navigateToDeleteTasksPage() async {
           message: 'You do not have permission to add tasks.',
         );
       }
-    }}
     }
+  }
+}
