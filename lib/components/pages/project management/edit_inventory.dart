@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as flutter;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -42,9 +41,6 @@ class _EditInventoryPageState extends State<EditInventoryPage>
   List<Map<String, dynamic>> _receivedEntries = [];
   List<Map<String, dynamic>> _issuedEntries = [];
 
-  // Debounce timer for auto-save
-  Timer? _debounceTimer;
-
   final List<String> _uomOptions = [
     'PCS',
     'KG',
@@ -62,26 +58,9 @@ class _EditInventoryPageState extends State<EditInventoryPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-
-    // Add listeners for auto-save on text field changes
-    _materialNameController.addListener(_onFieldChanged);
-    _requiredQtyController.addListener(_onFieldChanged);
-    _balIssueQtyController.addListener(_onFieldChanged);
-    _usedQtyController.addListener(_onFieldChanged);
-
     // Use post-frame callback to ensure widget is mounted
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInventoryItem();
-    });
-  }
-
-  void _onFieldChanged() {
-    // Cancel previous timer
-    _debounceTimer?.cancel();
-
-    // Start new timer - auto-save after 15 seconds of no changes
-    _debounceTimer = Timer(const Duration(milliseconds: 15000), () {
-      _autoSave();
     });
   }
 
@@ -96,7 +75,6 @@ class _EditInventoryPageState extends State<EditInventoryPage>
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
     _materialNameController.dispose();
     _requiredQtyController.dispose();
     _reasonController.dispose();
@@ -108,7 +86,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
 
   Future<void> _loadInventoryItem() async {
     if (!mounted) return;
-
+    
     try {
       final doc = await FirebaseFirestore.instance
           .collection('projects')
@@ -121,7 +99,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
 
       if (doc.exists) {
         final data = doc.data()!;
-
+        
         // Initialize with default values
         _originalData = {
           'materialName': data['materialName']?.toString() ?? '',
@@ -137,36 +115,33 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         };
 
         // Convert entries to proper format
-        _receivedEntries =
-            List<Map<String, dynamic>>.from(
-              _originalData['receivedEntries'] as List,
-            ).map((entry) {
-              return {
-                'challanNo': entry['challanNo']?.toString() ?? '',
-                'date': entry['date']?.toString() ?? '',
-                'qty': _safeParseInt(entry['qty']),
-              };
-            }).toList();
+        _receivedEntries = List<Map<String, dynamic>>.from(
+          _originalData['receivedEntries'] as List,
+        ).map((entry) {
+          return {
+            'challanNo': entry['challanNo']?.toString() ?? '',
+            'date': entry['date']?.toString() ?? '',
+            'qty': _safeParseInt(entry['qty']),
+            'id': entry['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          };
+        }).toList();
 
-        _issuedEntries =
-            List<Map<String, dynamic>>.from(
-              _originalData['issuedEntries'] as List,
-            ).map((entry) {
-              return {
-                'challanNo': entry['challanNo']?.toString() ?? '',
-                'date': entry['date']?.toString() ?? '',
-                'qty': _safeParseInt(entry['qty']),
-              };
-            }).toList();
+        _issuedEntries = List<Map<String, dynamic>>.from(
+          _originalData['issuedEntries'] as List,
+        ).map((entry) {
+          return {
+            'challanNo': entry['challanNo']?.toString() ?? '',
+            'date': entry['date']?.toString() ?? '',
+            'qty': _safeParseInt(entry['qty']),
+            'id': entry['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          };
+        }).toList();
 
         if (mounted) {
           setState(() {
-            _materialNameController.text =
-                _originalData['materialName'] as String;
-            _requiredQtyController.text = _originalData['requiredQty']
-                .toString();
-            _balIssueQtyController.text = _originalData['balIssueQty']
-                .toString();
+            _materialNameController.text = _originalData['materialName'] as String;
+            _requiredQtyController.text = _originalData['requiredQty'].toString();
+            _balIssueQtyController.text = _originalData['balIssueQty'].toString();
             _usedQtyController.text = _originalData['usedQty'].toString();
             _selectedUom = _originalData['uom'] as String;
             _isLoading = false;
@@ -203,125 +178,39 @@ class _EditInventoryPageState extends State<EditInventoryPage>
     return 0;
   }
 
-  List<String> _getChanges() {
-    List<String> changes = [];
-
-    final originalName = _originalData['materialName']?.toString() ?? '';
-    final newName = _materialNameController.text.trim();
-    if (originalName != newName) {
-      changes.add('Material name: "$originalName" → "$newName"');
-    }
-
-    final newRequiredQty = int.tryParse(_requiredQtyController.text) ?? 0;
-    final originalRequiredQty = _safeParseInt(_originalData['requiredQty']);
-    if (originalRequiredQty != newRequiredQty) {
-      changes.add('Required qty: $originalRequiredQty → $newRequiredQty');
-    }
-
-    // Calculate current totals from entries
-    final currentTotalReceived = _receivedEntries.fold<int>(0, (acc, entry) {
-      return acc + (entry['qty'] as int? ?? 0);
-    });
-    final originalTotalReceived = _safeParseInt(
-      _originalData['totalReceivedQty'],
-    );
-    if (originalTotalReceived != currentTotalReceived) {
-      changes.add(
-        'Total received qty: $originalTotalReceived → $currentTotalReceived',
-      );
-    }
-
-    // Calculate current totals from issued entries
-    final currentTotalIssued = _issuedEntries.fold<int>(0, (acc, entry) {
-      return acc + (entry['qty'] as int? ?? 0);
-    });
-    final originalTotalIssued = _safeParseInt(_originalData['totalIssuedQty']);
-    if (originalTotalIssued != currentTotalIssued) {
-      changes.add(
-        'Total issued qty: $originalTotalIssued → $currentTotalIssued',
-      );
-    }
-
-    final newBalIssueQty = int.tryParse(_balIssueQtyController.text) ?? 0;
-    final originalBalIssueQty = _safeParseInt(_originalData['balIssueQty']);
-    if (originalBalIssueQty != newBalIssueQty) {
-      changes.add('Balance issue qty: $originalBalIssueQty → $newBalIssueQty');
-    }
-
-    final newUsedQty = int.tryParse(_usedQtyController.text) ?? 0;
-    final originalUsedQty = _safeParseInt(_originalData['usedQty']);
-    if (originalUsedQty != newUsedQty) {
-      changes.add('Used qty: $originalUsedQty → $newUsedQty');
-    }
-
-    final originalUom = _originalData['uom']?.toString() ?? 'PCS';
-    if (originalUom != _selectedUom) {
-      changes.add('UOM: "$originalUom" → "$_selectedUom"');
-    }
-
-    // Check for received entries changes
-    final originalReceived = List<Map<String, dynamic>>.from(
-      (_originalData['receivedEntries'] ?? []) as List,
-    );
-    if (originalReceived.length != _receivedEntries.length) {
-      changes.add(
-        'Received entries count changed: ${originalReceived.length} → ${_receivedEntries.length}',
-      );
-    }
-
-    // Check for issued entries changes
-    final originalIssued = List<Map<String, dynamic>>.from(
-      (_originalData['issuedEntries'] ?? []) as List,
-    );
-    if (originalIssued.length != _issuedEntries.length) {
-      changes.add(
-        'Issued entries count changed: ${originalIssued.length} → ${_issuedEntries.length}',
-      );
-    }
-
-    return changes;
-  }
-
-  Future<void> _autoSave() async {
+  Future<void> _saveChanges() async {
     // Check if form is ready and mounted
     if (!_formReady || !mounted) {
+      _showSnackBar('Form is not ready. Please wait...', Colors.orange);
       return;
     }
-
+    
     // Check if form key exists
     if (_formKey.currentState == null) {
+      _showSnackBar('Please wait for form to load...', Colors.orange);
       return;
     }
-
+    
     // Validate form
     if (!_formKey.currentState!.validate()) {
+      _showSnackBar('Please fix validation errors', Colors.red);
       return;
     }
-
-    // Clean entries with null quantities before calculations
-    _receivedEntries.removeWhere((e) => e['qty'] == null);
-    _issuedEntries.removeWhere((e) => e['qty'] == null);
-
-    // Get changes for history
-    final changes = _getChanges();
 
     if (!mounted) return;
 
     setState(() => _isSaving = true);
-
+    
     try {
       // Parse input values safely
-      final requiredQty =
-          int.tryParse(_requiredQtyController.text) ??
-          _safeParseInt(_originalData['requiredQty']);
-
-      final usedQty =
-          int.tryParse(_usedQtyController.text) ??
-          _safeParseInt(_originalData['usedQty']);
-
-      final balIssueQty =
-          int.tryParse(_balIssueQtyController.text) ??
-          _safeParseInt(_originalData['balIssueQty']);
+      final requiredQty = int.tryParse(_requiredQtyController.text) ?? 
+                         _safeParseInt(_originalData['requiredQty']);
+      
+      final usedQty = int.tryParse(_usedQtyController.text) ?? 
+                     _safeParseInt(_originalData['usedQty']);
+      
+      final balIssueQty = int.tryParse(_balIssueQtyController.text) ?? 
+                         _safeParseInt(_originalData['balIssueQty']);
 
       // Calculate totals from entries
       final totalReceivedQty = _receivedEntries.fold<int>(0, (acc, entry) {
@@ -357,7 +246,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
 
       // Calculate balance quantity
       final balanceQty = totalReceivedQty - totalIssuedQty - usedQty;
-
+      
       // Validate balance can't be negative
       if (balanceQty < 0) {
         if (mounted) {
@@ -385,19 +274,6 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         'updatedAt': Timestamp.now(),
       };
 
-      // Create edit history entry
-      final editEntry = {
-        'editedBy': FirebaseAuth.instance.currentUser?.email ?? 'Unknown',
-        'editDate':
-            '${DateTime.now().day}.${DateTime.now().month.toString().padLeft(2, '0')}.${DateTime.now().year}',
-        'timestamp': Timestamp.now(),
-        'changes': changes,
-      };
-
-      if (_reasonController.text.trim().isNotEmpty) {
-        editEntry['reason'] = _reasonController.text.trim();
-      }
-
       final docRef = FirebaseFirestore.instance
           .collection('projects')
           .doc(widget.projectId)
@@ -406,30 +282,25 @@ class _EditInventoryPageState extends State<EditInventoryPage>
 
       // Get current document to check structure
       final snapshot = await docRef.get();
-
-      // Prepare data for update
-      final Map<String, dynamic> updateData = {
-        ...updatedData,
-        'editHistory': FieldValue.arrayUnion([editEntry]),
-      };
-
+      
       try {
         if (!snapshot.exists) {
           // Document doesn't exist - create it with all fields
           await docRef.set({
-            ...updateData,
+            ...updatedData,
             'createdAt': Timestamp.now(),
             'projectId': widget.projectId,
           });
         } else {
           // Document exists - update it
-          await docRef.update(updateData);
+          await docRef.update(updatedData);
         }
 
         if (mounted) {
           _showSnackBar('Inventory updated successfully', Colors.green);
           Navigator.of(context).pop(true);
         }
+        
       } on FirebaseException catch (e) {
         print('Firebase error: $e');
         if (mounted) {
@@ -441,6 +312,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
           _showSnackBar('Error saving changes', Colors.red);
         }
       }
+      
     } catch (e) {
       print('General error in saveChanges: $e');
       if (mounted) {
@@ -453,73 +325,11 @@ class _EditInventoryPageState extends State<EditInventoryPage>
     }
   }
 
-  void _showSnackBar(String message, Color color) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: const TextStyle(fontSize: 14)),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  void _addReceivedEntry() {
-    _showEntryDialog(
-      title: 'Add Received Entry',
-      isReceived: true,
-      onSave: (challanNo, date, qty) async {
-        if (mounted) {
-          setState(() {
-            _receivedEntries.add({
-              'challanNo': challanNo,
-              'date': date,
-              'qty': qty,
-            });
-          });
-          // Auto-save after adding entry
-          await _autoSave();
-        }
-      },
-    );
-  }
-
-  void _editReceivedEntry(int index) {
+  Future<void> _deleteReceivedEntry(int index, Map<String, dynamic> entry) async {
     if (index < 0 || index >= _receivedEntries.length) return;
-
-    final entry = _receivedEntries[index];
-    _showEntryDialog(
-      title: 'Edit Received Entry',
-      initialChallanNo: entry['challanNo']?.toString() ?? '',
-      initialDate: entry['date']?.toString() ?? '',
-      initialQty: entry['qty'] as int? ?? 0,
-      isReceived: true,
-      editingIndex: index,
-      onSave: (challanNo, date, qty) async {
-        if (mounted) {
-          setState(() {
-            _receivedEntries[index] = {
-              'challanNo': challanNo,
-              'date': date,
-              'qty': qty,
-            };
-          });
-          // Auto-save after editing entry
-          await _autoSave();
-        }
-      },
-    );
-  }
-
-  void _deleteReceivedEntry(int index) {
-    if (index < 0 || index >= _receivedEntries.length) return;
-
+    
     // Show confirmation dialog before deleting
-    showDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Received Entry'),
@@ -528,81 +338,84 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              if (mounted) {
-                setState(() {
-                  _receivedEntries.removeAt(index);
-                });
-                // Auto-save after deleting entry
-                await _autoSave();
-              }
-              Navigator.of(context).pop();
-              _showSnackBar('Received entry deleted', Colors.orange);
-            },
+            onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSaving = true);
+    
+    try {
+      // Update local state first for immediate UI feedback
+      final deletedEntry = _receivedEntries[index];
+      setState(() {
+        _receivedEntries.removeAt(index);
+      });
+
+      // Calculate new totals
+      final totalReceivedQty = _receivedEntries.fold<int>(0, (acc, e) {
+        return acc + (e['qty'] as int? ?? 0);
+      });
+
+      final totalIssuedQty = _issuedEntries.fold<int>(0, (acc, e) {
+        return acc + (e['qty'] as int? ?? 0);
+      });
+
+      final usedQty = int.tryParse(_usedQtyController.text) ?? 
+                    _safeParseInt(_originalData['usedQty']);
+      final balanceQty = totalReceivedQty - totalIssuedQty - usedQty;
+
+      // Update Firestore
+      final docRef = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('inventory')
+          .doc(widget.itemId);
+
+      await docRef.update({
+        'receivedEntries': _receivedEntries,
+        'totalReceivedQty': totalReceivedQty,
+        'balanceQty': balanceQty,
+        'updatedAt': Timestamp.now(),
+      });
+
+      if (mounted) {
+        _showSnackBar('Received entry deleted successfully', Colors.green);
+      }
+      
+    } catch (e) {
+      print('Error deleting received entry: $e');
+      // Revert local state if Firestore update fails
+      if (mounted) {
+        setState(() {
+          // Try to restore the deleted entry
+          if (index <= _receivedEntries.length) {
+            _receivedEntries.insert(index, entry);
+          }
+        });
+        _showSnackBar('Failed to delete entry', Colors.red);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
-  void _addIssuedEntry() {
-    _showEntryDialog(
-      title: 'Add Issued Entry',
-      isReceived: false,
-      onSave: (challanNo, date, qty) async {
-        if (mounted) {
-          setState(() {
-            _issuedEntries.add({
-              'challanNo': challanNo,
-              'date': date,
-              'qty': qty,
-            });
-          });
-          // Auto-save after adding entry
-          await _autoSave();
-        }
-      },
-    );
-  }
-
-  void _editIssuedEntry(int index) {
+  Future<void> _deleteIssuedEntry(int index, Map<String, dynamic> entry) async {
     if (index < 0 || index >= _issuedEntries.length) return;
-
-    final entry = _issuedEntries[index];
-    _showEntryDialog(
-      title: 'Edit Issued Entry',
-      initialChallanNo: entry['challanNo']?.toString() ?? '',
-      initialDate: entry['date']?.toString() ?? '',
-      initialQty: entry['qty'] as int? ?? 0,
-      isReceived: false,
-      editingIndex: index,
-      onSave: (challanNo, date, qty) async {
-        if (mounted) {
-          setState(() {
-            _issuedEntries[index] = {
-              'challanNo': challanNo,
-              'date': date,
-              'qty': qty,
-            };
-          });
-          // Auto-save after editing entry
-          await _autoSave();
-        }
-      },
-    );
-  }
-
-  void _deleteIssuedEntry(int index) {
-    if (index < 0 || index >= _issuedEntries.length) return;
-
+    
     // Show confirmation dialog before deleting
-    showDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Issued Entry'),
@@ -611,49 +424,97 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              if (mounted) {
-                setState(() {
-                  _issuedEntries.removeAt(index);
-                });
-                // Auto-save after deleting entry
-                await _autoSave();
-              }
-              Navigator.of(context).pop();
-              _showSnackBar('Issued entry deleted', Colors.orange);
-            },
+            onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSaving = true);
+    
+    try {
+      // Update local state first for immediate UI feedback
+      final deletedEntry = _issuedEntries[index];
+      setState(() {
+        _issuedEntries.removeAt(index);
+      });
+
+      // Calculate new totals
+      final totalReceivedQty = _receivedEntries.fold<int>(0, (acc, e) {
+        return acc + (e['qty'] as int? ?? 0);
+      });
+
+      final totalIssuedQty = _issuedEntries.fold<int>(0, (acc, e) {
+        return acc + (e['qty'] as int? ?? 0);
+      });
+
+      final usedQty = int.tryParse(_usedQtyController.text) ?? 
+                    _safeParseInt(_originalData['usedQty']);
+      final balanceQty = totalReceivedQty - totalIssuedQty - usedQty;
+
+      // Update Firestore
+      final docRef = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('inventory')
+          .doc(widget.itemId);
+
+      await docRef.update({
+        'issuedEntries': _issuedEntries,
+        'totalIssuedQty': totalIssuedQty,
+        'balanceQty': balanceQty,
+        'updatedAt': Timestamp.now(),
+      });
+
+      if (mounted) {
+        _showSnackBar('Issued entry deleted successfully', Colors.green);
+      }
+      
+    } catch (e) {
+      print('Error deleting issued entry: $e');
+      // Revert local state if Firestore update fails
+      if (mounted) {
+        setState(() {
+          // Try to restore the deleted entry
+          if (index <= _issuedEntries.length) {
+            _issuedEntries.insert(index, entry);
+          }
+        });
+        _showSnackBar('Failed to delete entry', Colors.red);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
-  void _showEntryDialog({
-    required String title,
-    String initialChallanNo = '',
-    String initialDate = '',
-    int initialQty = 0,
-    required Function(String, String, int) onSave,
-    bool isReceived = true,
-    int? editingIndex,
-  }) {
-    final challanController = TextEditingController(text: initialChallanNo);
-    final dateController = TextEditingController(text: initialDate);
-    final qtyController = TextEditingController(text: initialQty.toString());
+  Future<void> _addOrEditReceivedEntry({
+    String? entryId,
+    String? initialChallanNo,
+    String? initialDate,
+    int? initialQty,
+    bool isEditing = false,
+  }) async {
+    final challanController = TextEditingController(text: initialChallanNo ?? '');
+    final dateController = TextEditingController(text: initialDate ?? '');
+    final qtyController = TextEditingController(text: initialQty?.toString() ?? '');
 
     String? errorMessage;
 
-    showDialog(
+    final result = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text(title),
+          title: Text(isEditing ? 'Edit Received Entry' : 'Add Received Entry'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -662,10 +523,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                 decoration: const InputDecoration(
                   labelText: 'Challan No',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
               ),
               const SizedBox(height: 16),
@@ -674,10 +532,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                 decoration: const InputDecoration(
                   labelText: 'Date (DD.MM.YYYY)',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
               ),
               const SizedBox(height: 16),
@@ -688,20 +543,13 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                   labelText: 'Quantity',
                   border: const OutlineInputBorder(),
                   errorText: errorMessage,
-                  helperText: _getQuantityHelperText(isReceived),
+                  helperText: _getQuantityHelperText(true),
                   helperMaxLines: 2,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
                 onChanged: (value) {
                   setState(() {
-                    errorMessage = _validateQuantity(
-                      value,
-                      isReceived,
-                      editingIndex,
-                    );
+                    errorMessage = _validateQuantity(value, true, isEditing);
                   });
                 },
               ),
@@ -735,7 +583,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(context).pop(null),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
@@ -747,8 +595,12 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                       final qty = int.tryParse(qtyController.text) ?? 0;
 
                       if (challanNo.isNotEmpty && date.isNotEmpty && qty > 0) {
-                        onSave(challanNo, date, qty);
-                        Navigator.of(context).pop();
+                        Navigator.of(context).pop({
+                          'challanNo': challanNo,
+                          'date': date,
+                          'qty': qty,
+                          'id': entryId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                        });
                       }
                     },
               child: const Text('Save'),
@@ -757,9 +609,286 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         ),
       ),
     );
+
+    if (result == null) return;
+
+    setState(() => _isSaving = true);
+    
+    try {
+      List<Map<String, dynamic>> newReceivedEntries;
+      
+      if (isEditing && entryId != null) {
+        // Find and update existing entry
+        newReceivedEntries = _receivedEntries.map((entry) {
+          if (entry['id'] == entryId) {
+            return {
+              ...entry,
+              'challanNo': result['challanNo'],
+              'date': result['date'],
+              'qty': result['qty'],
+            };
+          }
+          return entry;
+        }).toList();
+      } else {
+        // Add new entry
+        newReceivedEntries = [..._receivedEntries, result];
+      }
+
+      // Calculate new totals
+      final totalReceivedQty = newReceivedEntries.fold<int>(0, (acc, entry) {
+        return acc + (entry['qty'] as int? ?? 0);
+      });
+
+      final totalIssuedQty = _issuedEntries.fold<int>(0, (acc, entry) {
+        return acc + (entry['qty'] as int? ?? 0);
+      });
+
+      final usedQty = int.tryParse(_usedQtyController.text) ?? 
+                    _safeParseInt(_originalData['usedQty']);
+      final balanceQty = totalReceivedQty - totalIssuedQty - usedQty;
+
+      // Update Firestore
+      final docRef = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('inventory')
+          .doc(widget.itemId);
+
+      await docRef.update({
+        'receivedEntries': newReceivedEntries,
+        'totalReceivedQty': totalReceivedQty,
+        'balanceQty': balanceQty,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Update local state
+      if (mounted) {
+        setState(() {
+          _receivedEntries = newReceivedEntries;
+        });
+        _showSnackBar(
+          isEditing ? 'Received entry updated successfully' : 'Received entry added successfully',
+          Colors.green,
+        );
+      }
+      
+    } catch (e) {
+      print('Error ${isEditing ? 'updating' : 'adding'} received entry: $e');
+      if (mounted) {
+        _showSnackBar('Failed to ${isEditing ? 'update' : 'add'} entry', Colors.red);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
-  String? _validateQuantity(String value, bool isReceived, int? editingIndex) {
+  Future<void> _addOrEditIssuedEntry({
+    String? entryId,
+    String? initialChallanNo,
+    String? initialDate,
+    int? initialQty,
+    bool isEditing = false,
+  }) async {
+    final challanController = TextEditingController(text: initialChallanNo ?? '');
+    final dateController = TextEditingController(text: initialDate ?? '');
+    final qtyController = TextEditingController(text: initialQty?.toString() ?? '');
+
+    String? errorMessage;
+
+    final result = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(isEditing ? 'Edit Issued Entry' : 'Add Issued Entry'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: challanController,
+                decoration: const InputDecoration(
+                  labelText: 'Challan No',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: dateController,
+                decoration: const InputDecoration(
+                  labelText: 'Date (DD.MM.YYYY)',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: qtyController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Quantity',
+                  border: const OutlineInputBorder(),
+                  errorText: errorMessage,
+                  helperText: _getQuantityHelperText(false),
+                  helperMaxLines: 2,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    errorMessage = _validateQuantity(value, false, isEditing);
+                  });
+                },
+              ),
+              if (errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(4),
+                    border: flutter.Border.all(color: Colors.red[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.red[600], size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          errorMessage!,
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: errorMessage != null
+                  ? null
+                  : () {
+                      final challanNo = challanController.text.trim();
+                      final date = dateController.text.trim();
+                      final qty = int.tryParse(qtyController.text) ?? 0;
+
+                      if (challanNo.isNotEmpty && date.isNotEmpty && qty > 0) {
+                        Navigator.of(context).pop({
+                          'challanNo': challanNo,
+                          'date': date,
+                          'qty': qty,
+                          'id': entryId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                        });
+                      }
+                    },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    setState(() => _isSaving = true);
+    
+    try {
+      List<Map<String, dynamic>> newIssuedEntries;
+      
+      if (isEditing && entryId != null) {
+        // Find and update existing entry
+        newIssuedEntries = _issuedEntries.map((entry) {
+          if (entry['id'] == entryId) {
+            return {
+              ...entry,
+              'challanNo': result['challanNo'],
+              'date': result['date'],
+              'qty': result['qty'],
+            };
+          }
+          return entry;
+        }).toList();
+      } else {
+        // Add new entry
+        newIssuedEntries = [..._issuedEntries, result];
+      }
+
+      // Calculate new totals
+      final totalReceivedQty = _receivedEntries.fold<int>(0, (acc, entry) {
+        return acc + (entry['qty'] as int? ?? 0);
+      });
+
+      final totalIssuedQty = newIssuedEntries.fold<int>(0, (acc, entry) {
+        return acc + (entry['qty'] as int? ?? 0);
+      });
+
+      final usedQty = int.tryParse(_usedQtyController.text) ?? 
+                    _safeParseInt(_originalData['usedQty']);
+      final balanceQty = totalReceivedQty - totalIssuedQty - usedQty;
+
+      // Update Firestore
+      final docRef = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('inventory')
+          .doc(widget.itemId);
+
+      await docRef.update({
+        'issuedEntries': newIssuedEntries,
+        'totalIssuedQty': totalIssuedQty,
+        'balanceQty': balanceQty,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Update local state
+      if (mounted) {
+        setState(() {
+          _issuedEntries = newIssuedEntries;
+        });
+        _showSnackBar(
+          isEditing ? 'Issued entry updated successfully' : 'Issued entry added successfully',
+          Colors.green,
+        );
+      }
+      
+    } catch (e) {
+      print('Error ${isEditing ? 'updating' : 'adding'} issued entry: $e');
+      if (mounted) {
+        _showSnackBar('Failed to ${isEditing ? 'update' : 'add'} entry', Colors.red);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontSize: 14)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  String? _validateQuantity(String value, bool isReceived, bool isEditing) {
     final qty = int.tryParse(value);
     if (qty == null || qty <= 0) {
       return qty == null
@@ -767,27 +896,18 @@ class _EditInventoryPageState extends State<EditInventoryPage>
           : 'Quantity must be greater than 0';
     }
 
-    final requiredQty =
-        int.tryParse(_requiredQtyController.text) ??
-        _safeParseInt(_originalData['requiredQty']);
+    final requiredQty = int.tryParse(_requiredQtyController.text) ??
+                      _safeParseInt(_originalData['requiredQty']);
 
     if (isReceived) {
-      // Calculate current total received (excluding the entry being edited)
-      int currentTotalReceived = 0;
-      for (int i = 0; i < _receivedEntries.length; i++) {
-        if (editingIndex == null || i != editingIndex) {
-          final entry = _receivedEntries[i];
-          final entryQty = entry['qty'] as int?;
-          if (entryQty != null) {
-            currentTotalReceived += entryQty;
-          }
-        }
-      }
+      // For received entries
+      final currentTotalReceived = _receivedEntries.fold<int>(0, (acc, entry) {
+        final entryQty = entry['qty'] as int?;
+        return entryQty != null ? acc + entryQty : acc;
+      });
 
-      final newTotalReceived = currentTotalReceived + qty;
-
-      if (newTotalReceived > requiredQty) {
-        return 'Cannot exceed required quantity ($requiredQty)\nCurrent total would be: $newTotalReceived';
+      if (qty > requiredQty) {
+        return 'Cannot exceed required quantity ($requiredQty)';
       }
     } else {
       // For issued entries - validate against available quantity
@@ -795,28 +915,19 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         final entryQty = entry['qty'] as int?;
         return entryQty != null ? acc + entryQty : acc;
       });
+      
+      final currentUsedQty = int.tryParse(_usedQtyController.text) ??
+                           _safeParseInt(_originalData['usedQty']);
+                           
+      final currentTotalIssued = _issuedEntries.fold<int>(0, (acc, entry) {
+        final entryQty = entry['qty'] as int?;
+        return entryQty != null ? acc + entryQty : acc;
+      });
 
-      final currentUsedQty =
-          int.tryParse(_usedQtyController.text) ??
-          _safeParseInt(_originalData['usedQty']);
-
-      // Calculate current total issued (excluding the entry being edited)
-      int currentTotalIssued = 0;
-      for (int i = 0; i < _issuedEntries.length; i++) {
-        if (editingIndex == null || i != editingIndex) {
-          final entry = _issuedEntries[i];
-          final entryQty = entry['qty'] as int?;
-          if (entryQty != null) {
-            currentTotalIssued += entryQty;
-          }
-        }
-      }
-
-      final availableQty =
-          currentTotalReceived - currentTotalIssued - currentUsedQty;
+      final availableQty = currentTotalReceived - currentTotalIssued - currentUsedQty;
 
       if (qty > availableQty) {
-        return 'Cannot issue more than available quantity ($availableQty)\nReceived: $currentTotalReceived, Used: $currentUsedQty, Already Issued: $currentTotalIssued';
+        return 'Cannot issue more than available quantity ($availableQty)';
       }
     }
 
@@ -825,9 +936,8 @@ class _EditInventoryPageState extends State<EditInventoryPage>
 
   String _getQuantityHelperText(bool isReceived) {
     if (isReceived) {
-      final requiredQty =
-          int.tryParse(_requiredQtyController.text) ??
-          _safeParseInt(_originalData['requiredQty']);
+      final requiredQty = int.tryParse(_requiredQtyController.text) ??
+                         _safeParseInt(_originalData['requiredQty']);
       final currentTotalReceived = _receivedEntries.fold<int>(0, (acc, entry) {
         final entryQty = entry['qty'] as int?;
         return entryQty != null ? acc + entryQty : acc;
@@ -840,18 +950,16 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         final entryQty = entry['qty'] as int?;
         return entryQty != null ? acc + entryQty : acc;
       });
-
-      final currentUsedQty =
-          int.tryParse(_usedQtyController.text) ??
-          _safeParseInt(_originalData['usedQty']);
-
+      
+      final currentUsedQty = int.tryParse(_usedQtyController.text) ??
+                           _safeParseInt(_originalData['usedQty']);
+                           
       final currentTotalIssued = _issuedEntries.fold<int>(0, (acc, entry) {
         final entryQty = entry['qty'] as int?;
         return entryQty != null ? acc + entryQty : acc;
       });
-
-      final available =
-          currentTotalReceived - currentTotalIssued - currentUsedQty;
+      
+      final available = currentTotalReceived - currentTotalIssued - currentUsedQty;
 
       return 'Available to issue: $available (Received: $currentTotalReceived, Used: $currentUsedQty, Issued: $currentTotalIssued)';
     }
@@ -867,47 +975,43 @@ class _EditInventoryPageState extends State<EditInventoryPage>
         title: const Text('Edit Inventory'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        elevation: 0.5,
+        elevation: 1,
         titleTextStyle: const TextStyle(
           color: Colors.black,
           fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
         actions: [
-          // Auto-save indicator
-          if (_isSaving)
+          if (!_isLoading && _formReady)
             Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.blue[600]!,
-                      ),
-                    ),
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: _isSaving ? null : _saveChanges,
+                icon: _isSaving
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                        ),
+                      )
+                    : const Icon(Icons.save, size: 18),
+                label: Text(_isSaving ? 'Saving...' : 'Save'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.blue[600],
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Saving...',
-                    style: TextStyle(
-                      color: Colors.blue[600],
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
         ],
         bottom: _isLoading
             ? null
             : PreferredSize(
-                preferredSize: const Size.fromHeight(48),
+                preferredSize: const Size.fromHeight(60),
                 child: TabBar(
                   controller: _tabController,
                   labelColor: Colors.blue[600],
@@ -952,17 +1056,16 @@ class _EditInventoryPageState extends State<EditInventoryPage>
       final entryQty = entry['qty'] as int?;
       return entryQty != null ? acc + entryQty : acc;
     });
-
+    
     final totalIssuedQty = _issuedEntries.fold<int>(0, (acc, entry) {
       final entryQty = entry['qty'] as int?;
       return entryQty != null ? acc + entryQty : acc;
     });
-
-    final usedQty =
-        int.tryParse(_usedQtyController.text) ??
-        _safeParseInt(_originalData['usedQty']);
+    
+    final usedQty = int.tryParse(_usedQtyController.text) ?? 
+                  _safeParseInt(_originalData['usedQty']);
     final balanceQty = totalReceivedQty - totalIssuedQty - usedQty;
-
+    
     return SingleChildScrollView(
       child: Center(
         child: ConstrainedBox(
@@ -1088,9 +1191,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                                     label: 'Current Balance Qty',
                                     value: balanceQty.toString(),
                                     icon: Icons.inventory_2,
-                                    color: balanceQty < 0
-                                        ? Colors.red
-                                        : Colors.blue,
+                                    color: balanceQty < 0 ? Colors.red : Colors.blue,
                                   ),
                                 ),
                               ],
@@ -1129,9 +1230,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                                     label: 'Current Balance',
                                     value: balanceQty.toString(),
                                     icon: Icons.inventory_2,
-                                    color: balanceQty < 0
-                                        ? Colors.red
-                                        : Colors.blue,
+                                    color: balanceQty < 0 ? Colors.red : Colors.blue,
                                   ),
                                 ),
                               ],
@@ -1164,13 +1263,13 @@ class _EditInventoryPageState extends State<EditInventoryPage>
 
                           const SizedBox(height: 20),
 
-                          // Reason field
+                          // Reason field (optional)
                           _buildCompactTextField(
                             controller: _reasonController,
-                            label: 'Reason for Changes (Optional)',
+                            label: 'Notes (Optional)',
                             icon: Icons.note_alt_outlined,
                             maxLines: 2,
-                            hint: 'Brief reason for the changes...',
+                            hint: 'Add any notes...',
                           ),
                         ],
                       ),
@@ -1206,7 +1305,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                                 'Original Values',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.blueAccent,
+                                  color: Colors.blue,
                                   fontSize: 14,
                                 ),
                               ),
@@ -1278,7 +1377,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
       final entryQty = entry['qty'] as int?;
       return entryQty != null ? acc + entryQty : acc;
     });
-
+    
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1312,7 +1411,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                     ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: _addReceivedEntry,
+                    onPressed: _isSaving ? null : () => _addOrEditReceivedEntry(),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Add Entry'),
                     style: ElevatedButton.styleFrom(
@@ -1352,7 +1451,8 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                       final challanNo = entry['challanNo']?.toString() ?? 'N/A';
                       final date = entry['date']?.toString() ?? 'N/A';
                       final qty = entry['qty'] as int? ?? 0;
-
+                      final entryId = entry['id']?.toString() ?? '';
+                      
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
@@ -1371,13 +1471,37 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit, size: 18),
-                                onPressed: () => _editReceivedEntry(index),
+                                icon: _isSaving 
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+                                        ),
+                                      )
+                                    : const Icon(Icons.edit, size: 18),
+                                onPressed: _isSaving ? null : () => _addOrEditReceivedEntry(
+                                  entryId: entryId,
+                                  initialChallanNo: challanNo,
+                                  initialDate: date,
+                                  initialQty: qty,
+                                  isEditing: true,
+                                ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, size: 18),
+                                icon: _isSaving
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+                                        ),
+                                      )
+                                    : const Icon(Icons.delete, size: 18),
                                 color: Colors.red,
-                                onPressed: () => _deleteReceivedEntry(index),
+                                onPressed: _isSaving ? null : () => _deleteReceivedEntry(index, entry),
                               ),
                             ],
                           ),
@@ -1396,7 +1520,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
       final entryQty = entry['qty'] as int?;
       return entryQty != null ? acc + entryQty : acc;
     });
-
+    
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1430,7 +1554,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                     ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: _addIssuedEntry,
+                    onPressed: _isSaving ? null : () => _addOrEditIssuedEntry(),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Add Entry'),
                     style: ElevatedButton.styleFrom(
@@ -1470,7 +1594,8 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                       final challanNo = entry['challanNo']?.toString() ?? 'N/A';
                       final date = entry['date']?.toString() ?? 'N/A';
                       final qty = entry['qty'] as int? ?? 0;
-
+                      final entryId = entry['id']?.toString() ?? '';
+                      
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
@@ -1489,13 +1614,37 @@ class _EditInventoryPageState extends State<EditInventoryPage>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit, size: 18),
-                                onPressed: () => _editIssuedEntry(index),
+                                icon: _isSaving
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+                                        ),
+                                      )
+                                    : const Icon(Icons.edit, size: 18),
+                                onPressed: _isSaving ? null : () => _addOrEditIssuedEntry(
+                                  entryId: entryId,
+                                  initialChallanNo: challanNo,
+                                  initialDate: date,
+                                  initialQty: qty,
+                                  isEditing: true,
+                                ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, size: 18),
+                                icon: _isSaving
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+                                        ),
+                                      )
+                                    : const Icon(Icons.delete, size: 18),
                                 color: Colors.red,
-                                onPressed: () => _deleteIssuedEntry(index),
+                                onPressed: _isSaving ? null : () => _deleteIssuedEntry(index, entry),
                               ),
                             ],
                           ),
@@ -1610,8 +1759,6 @@ class _EditInventoryPageState extends State<EditInventoryPage>
           setState(() {
             _selectedUom = newValue;
           });
-          // Auto-save when UOM changes
-          _onFieldChanged();
         }
       },
     );
@@ -1640,7 +1787,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
             ),
           ),
         ],
-      ),
+      )
     );
   }
 
@@ -1667,7 +1814,10 @@ class _EditInventoryPageState extends State<EditInventoryPage>
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
                 Text(
                   value,
@@ -1681,7 +1831,7 @@ class _EditInventoryPageState extends State<EditInventoryPage>
             ),
           ),
         ],
-      ),
+      )
     );
   }
 }

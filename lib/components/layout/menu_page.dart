@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vevij/models/permissions/employee_permission.dart';
 import 'package:vevij/components/pages/permission_management_page.dart';
-// import 'package:vevij/components/pages/atttendance/mark_attendance.dart';
+import 'package:vevij/components/pages/atttendance/mark_attendance.dart';
 import 'package:vevij/components/pages/atttendance/empattandance.dart';
 import 'package:vevij/components/pages/atttendance/employeeattendancereportpage.dart';
 import 'package:vevij/components/pages/atttendance/admin_attendace_report_page.dart';
@@ -148,20 +148,20 @@ class _MenuPageState extends State<MenuPage> {
         ),
       );
     }
-    // if (await EmployeePermissionChecker.can(
-    //   widget.userId,
-    //   EmployeePermission.manageAttendance,
-    // )) {
-    //   items.add(
-    //     MenuItem(
-    //       title: 'Attendance',
-    //       icon: Icons.access_time,
-    //       color: Colors.green,
-    //       page: const MarkAttendancePage(),
-    //       requiredPermission: EmployeePermission.manageAttendance,
-    //     ),
-    //   );
-    // }
+    if (await EmployeePermissionChecker.can(
+      widget.userId,
+      EmployeePermission.manageAttendance,
+    )) {
+      items.add(
+        MenuItem(
+          title: 'Attendance',
+          icon: Icons.access_time,
+          color: Colors.green,
+          page: const MarkAttendancePage(),
+          requiredPermission: EmployeePermission.manageAttendance,
+        ),
+      );
+    }
     if (await EmployeePermissionChecker.can(
       widget.userId,
       EmployeePermission.adminManageAttendance,
